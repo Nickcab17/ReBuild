@@ -1,0 +1,94 @@
+service: rebuild-backend
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ${env:AWS_REGION, 'us-east-1'}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:DescribeTable
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource: arn:aws:dynamodb:${self:provider.region}:*:table/Rebuild*
+  environment:
+    NODE_ENV: production
+    JWT_SECRET: ${env:JWT_SECRET, 'dev-secret'}
+    DYNAMODB_ENABLED: 'true'
+    DYNAMODB_TABLE_PREFIX: Rebuild
+
+functions:
+  api:
+    handler: src/lambda.handler
+    events:
+      - http:
+          path: /{proxy+}
+          method: any
+          cors: true
+
+resources:
+  Resources:
+    RebuildUsers:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: RebuildUsers
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+    RebuildMaterials:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: RebuildMaterials
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+    RebuildRequests:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: RebuildRequests
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+    RebuildFavorites:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: RebuildFavorites
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+    RebuildMatches:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: RebuildMatches
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+
+plugins:
+  - serverless-offline

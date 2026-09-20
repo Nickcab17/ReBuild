@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Rebuild",
+    "slug": "rebuild",
+    "scheme": "rebuild",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-status-bar"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.rebuild.app"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
