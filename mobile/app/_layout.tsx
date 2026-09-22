@@ -1,11 +1,24 @@
 import { Tabs, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
+import { Sora_400Regular, Sora_500Medium, Sora_600SemiBold, Sora_700Bold, Sora_800ExtraBold } from '@expo-google-fonts/sora';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../contexts/AuthContext';
 
 export default function RootLayout() {
   const segments = useSegments();
   const hideTabBar = segments.includes('login') || segments.includes('register') || segments.includes('material');
+  const [fontsLoaded] = useFonts({
+    Sora_400Regular,
+    Sora_500Medium,
+    Sora_600SemiBold,
+    Sora_700Bold,
+    Sora_800ExtraBold,
+  });
+
+  if (!fontsLoaded) {
+    return null;
+  }
 
   return (
     <SafeAreaProvider>
