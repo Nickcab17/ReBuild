@@ -4,23 +4,25 @@ import { colors, shadows, typography } from '../constants/theme';
 
 export function RebuildMark({ size = 32, accent = colors.terracotta }: { size?: number; accent?: string }) {
   return (
-    <View style={[styles.markWrap, { width: size, height: size, borderRadius: size * 0.32 }]}> 
-      <View style={[styles.stem, { backgroundColor: colors.primary, height: size * 0.68, width: size * 0.14, left: size * 0.22, top: size * 0.18 }]} />
-      <View style={[styles.loop, { backgroundColor: accent, width: size * 0.34, height: size * 0.34, right: size * 0.18, top: size * 0.14 }]} />
-      <View style={[styles.diag, { backgroundColor: colors.primary, width: size * 0.24, height: size * 0.12, right: size * 0.14, bottom: size * 0.2, transform: [{ rotate: '-38deg' }] }]} />
-      <View style={[styles.foot, { backgroundColor: accent, width: size * 0.25, height: size * 0.12, right: size * 0.18, bottom: size * 0.18, transform: [{ rotate: '-38deg' }] }]} />
-      <View style={[styles.connector, { backgroundColor: colors.sage, width: size * 0.10, height: size * 0.10, left: size * 0.52, top: size * 0.45 }]} />
+    <View
+      style={[styles.markWrap, { width: size, height: size, borderRadius: size * 0.24, backgroundColor: colors.forestDeep, borderColor: accent }]}
+    >
+      <View style={[styles.tileCorner, styles.cornerTopLeft, { width: size * 0.25, height: size * 0.25, borderColor: colors.cream }]} />
+      <View style={[styles.tileCorner, styles.cornerTopRight, { width: size * 0.25, height: size * 0.25, borderColor: colors.sage }]} />
+      <View style={[styles.tileCorner, styles.cornerBottomLeft, { width: size * 0.25, height: size * 0.25, borderColor: colors.sage }]} />
+      <View style={[styles.tileCorner, styles.cornerBottomRight, { width: size * 0.25, height: size * 0.25, borderColor: colors.cream }]} />
+      <View style={[styles.tileCore, { width: size * 0.31, height: size * 0.31, backgroundColor: accent, borderColor: colors.cream }]} />
+      <View style={[styles.tileCoreInner, { width: size * 0.11, height: size * 0.11, backgroundColor: colors.forestDeep }]} />
     </View>
   );
 }
 
 export function RebuildWordmark({ compact = false, accent = colors.terracotta }: { compact?: boolean; accent?: string }) {
   return (
-    <Text style={[typography.brandWordmark, compact && styles.compactWordmark]}>
-      <Text style={[styles.wordmarkBase, { color: colors.primary }]}>R</Text>
-      <Text style={[styles.wordmarkBase, { color: colors.text }]}>ebuild</Text>
-      <Text style={[styles.wordmarkAccent, { color: accent }]}>.</Text>
-    </Text>
+    <View style={styles.wordmarkStack}>
+      <Text style={[typography.brandWordmark, styles.wordmarkOutline, compact && styles.compactWordmark]} accessibilityLabel="REBUILD">REBUILD</Text>
+      <Text style={[typography.brandWordmark, styles.wordmarkFill, compact && styles.compactWordmark]}>REBUILD<Text style={[styles.wordmarkAccent, { color: accent }]}>·</Text></Text>
+    </View>
   );
 }
 
@@ -82,12 +84,17 @@ const styles = StyleSheet.create({
   compactWordmark: { fontSize: 22, lineHeight: 24 },
   wordmarkBase: { fontFamily: 'Sora_800ExtraBold', letterSpacing: -1.1 },
   wordmarkAccent: { fontFamily: 'Sora_800ExtraBold', letterSpacing: -0.8 },
-  markWrap: { backgroundColor: colors.surface, borderWidth: 2, borderColor: colors.primary, position: 'relative', overflow: 'hidden' },
-  stem: { position: 'absolute', borderRadius: 999, borderWidth: 1, borderColor: colors.primary },
-  loop: { position: 'absolute', borderRadius: 999 },
-  diag: { position: 'absolute', borderRadius: 999 },
-  foot: { position: 'absolute', borderRadius: 999 },
-  connector: { position: 'absolute', borderRadius: 999 },
+  markWrap: { borderWidth: 2, position: 'relative', overflow: 'hidden' },
+  tileCorner: { position: 'absolute', borderWidth: 2 },
+  cornerTopLeft: { left: '18%', top: '18%', borderRightWidth: 0, borderBottomWidth: 0 },
+  cornerTopRight: { right: '18%', top: '18%', borderLeftWidth: 0, borderBottomWidth: 0 },
+  cornerBottomLeft: { left: '18%', bottom: '18%', borderRightWidth: 0, borderTopWidth: 0 },
+  cornerBottomRight: { right: '18%', bottom: '18%', borderLeftWidth: 0, borderTopWidth: 0 },
+  tileCore: { position: 'absolute', alignSelf: 'center', top: '34%', transform: [{ rotate: '45deg' }], borderWidth: 1 },
+  tileCoreInner: { position: 'absolute', alignSelf: 'center', top: '45%', transform: [{ rotate: '45deg' }] },
+  wordmarkStack: { position: 'relative', justifyContent: 'center' },
+  wordmarkOutline: { position: 'absolute', color: colors.terracotta, opacity: 0.48, transform: [{ translateX: 1 }, { translateY: 1 }] },
+  wordmarkFill: { color: colors.forestDeep },
   headerCard: { backgroundColor: colors.surface, borderRadius: 24, padding: 18, ...shadows.soft },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   primaryButton: { backgroundColor: colors.primary, borderRadius: 16, paddingVertical: 16, alignItems: 'center', justifyContent: 'center', ...shadows.soft },

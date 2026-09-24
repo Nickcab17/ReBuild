@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View, TextInput, TouchableOpacity, Image } from 'react-native';
 import { Link, useFocusEffect, useRouter } from 'expo-router';
 import { colors, categories } from '../constants/theme';
+import { Logo } from '../components/Branding';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 import type { Material } from '../types';
@@ -12,6 +13,7 @@ export default function HomeScreen() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [matchCount, setMatchCount] = useState(0);
   const [query, setQuery] = useState('');
+  const [materialsError, setMaterialsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) router.replace('/login');
@@ -19,7 +21,7 @@ export default function HomeScreen() {
 
   useFocusEffect(() => {
     let active = true;
-    api.listMaterials().then((data) => { if (active) setMaterials(data as Material[]); }).catch(() => { if (active) setMaterials([]); });
+    api.listMaterials().then((data) => { if (active) { setMaterials(data as Material[]); setMaterialsError(null); } }).catch((error) => { if (active) setMaterialsError(error instanceof Error ? error.message : 'No se pudieron cargar los materiales.'); });
     return () => { active = false; };
   });
 
@@ -40,7 +42,7 @@ export default function HomeScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.headerCard}>
-        <Text style={styles.eyebrow}>Rebuild</Text>
+        <Logo compact />
         <Text style={styles.title}>{loading ? 'Cargando...' : user ? `Hola, ${user.name.split(' ')[0]}` : 'Bienvenido a Rebuild'}</Text>
         <Text style={styles.subtitle}>¿Qué necesitas encontrar?</Text>
         <TextInput
@@ -90,7 +92,12 @@ export default function HomeScreen() {
 
       <Text style={styles.sectionTitle}>Publicaciones recientes</Text>
 
-      {visibleMaterials.length === 0 ? (
+      {materialsError ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateTitle}>No pudimos cargar los materiales</Text>
+          <Text style={styles.emptyStateText}>{materialsError}</Text>
+        </View>
+      ) : visibleMaterials.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateTitle}>Sin materiales todavía</Text>
           <Text style={styles.emptyStateText}>Aún no hay publicaciones en esta búsqueda.</Text>

@@ -13,6 +13,7 @@
     "@expo-google-fonts/dm-sans": "^0.4.2",
     "@expo-google-fonts/sora": "^0.4.2",
     "expo": "~57.0.24",
+    "expo-blob": "^57.0.2",
     "expo-camera": "~57.0.5",
     "expo-font": "^57.0.4",
     "expo-image-picker": "~57.0.19",

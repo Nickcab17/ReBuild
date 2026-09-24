@@ -1,5 +1,15 @@
 const API_URL = (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/$/, '');
 
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_URL}${path}`;
   let response: Response;
@@ -17,7 +27,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
-    throw new Error(errorBody.message || 'Error en la solicitud.');
+    throw new ApiError(errorBody.message || 'Error en la solicitud.', response.status);
   }
 
   return response.json() as Promise<T>;
@@ -28,9 +38,16 @@ export const api = {
   register: (payload: any) => request('/api/auth/register', { method: 'POST', body: JSON.stringify(payload) }),
   login: (payload: any) => request('/api/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
   getMe: (token: string) => request('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
-  listMaterials: (params: Record<string, string | number | undefined> = {}) => {
+  listMaterials: async (params: Record<string, string | number | undefined> = {}) => {
     const query = Object.entries(params).filter(([, value]) => value !== undefined && value !== '').map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`).join('&');
-    return request(`/api/materials${query ? `?${query}` : ''}`);
+    const payload = await request<unknown>(`/api/materials${query ? `?${query}` : ''}`);
+    if (Array.isArray(payload)) return payload;
+    if (payload && typeof payload === 'object') {
+      const collection = payload as { value?: unknown; data?: unknown };
+      if (Array.isArray(collection.value)) return collection.value;
+      if (Array.isArray(collection.data)) return collection.data;
+    }
+    throw new Error('La API devolvió un formato de materiales inválido.');
   },
   getMaterialById: (id: string) => request(`/api/materials/${id}`),
   listRequests: (token: string) => request('/api/requests', { headers: { Authorization: `Bearer ${token}` } }),
@@ -38,6 +55,7 @@ export const api = {
   createMaterial: (payload: any, token: string) => request('/api/materials', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) }),
   createRequest: (payload: any, token: string) => request('/api/requests', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) }),
   classifyMaterial: (text: string) => request('/api/ai/classify-material', { method: 'POST', body: JSON.stringify({ text }) }),
+  analyzeMaterialImage: (imageDataUrl: string) => request('/api/ai/analyze-material-image', { method: 'POST', body: JSON.stringify({ imageDataUrl }) }),
   getFavorites: (token: string) => request('/api/favorites', { headers: { Authorization: `Bearer ${token}` } }),
   addFavorite: (materialId: string, token: string) => request(`/api/favorites/${materialId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } }),
   removeFavorite: (materialId: string, token: string) => request(`/api/favorites/${materialId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }),

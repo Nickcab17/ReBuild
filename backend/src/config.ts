@@ -9,4 +9,7 @@ export const config = {
   isLocal: process.env.NODE_ENV !== 'production',
   dynamoEnabled: process.env.DYNAMODB_ENABLED === 'true',
   dynamoTablePrefix: process.env.DYNAMODB_TABLE_PREFIX ?? 'Rebuild',
+  aiVisionApiUrl: process.env.AI_VISION_API_URL ?? '',
+  aiVisionApiKey: process.env.AI_VISION_API_KEY ?? '',
+  aiVisionModel: process.env.AI_VISION_MODEL ?? 'gpt-4o-mini',
 };

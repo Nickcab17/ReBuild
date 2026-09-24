@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { storage } from '../services/storage';
-import { api } from '../services/api';
+import { api, ApiError } from '../services/api';
 
 interface User {
   id: string;
@@ -29,8 +29,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const loadSession = async () => {
+    const savedToken = await storage.getToken();
     try {
-      const savedToken = await storage.getToken();
       if (!savedToken) {
         setUser(null);
         setToken(null);
@@ -40,10 +40,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const me = await api.getMe(savedToken);
       setToken(savedToken);
       setUser(me as User);
-    } catch {
-      await storage.clearToken();
-      setToken(null);
-      setUser(null);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        await storage.clearToken();
+        setToken(null);
+        setUser(null);
+      } else {
+        setToken(savedToken);
+        setUser(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -56,6 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     const response = await api.login({ email, password });
     const nextToken = (response as any).token as string;
+    if (!nextToken) throw new Error('La API de login no devolvió un token de sesión.');
     await storage.setToken(nextToken);
     setToken(nextToken);
     setUser((response as any).user as User);
@@ -64,6 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (name: string, email: string, password: string, city: string) => {
     const response = await api.register({ name, email, password, city });
     const nextToken = (response as any).token as string;
+    if (!nextToken) throw new Error('La API de registro no devolvió un token de sesión.');
     await storage.setToken(nextToken);
     setToken(nextToken);
     setUser((response as any).user as User);

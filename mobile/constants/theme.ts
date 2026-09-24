@@ -64,7 +64,7 @@ export const typography = {
   h2: { fontFamily: 'Sora_700Bold', fontSize: 24, lineHeight: 30, color: colors.text, letterSpacing: -0.5 },
   h3: { fontFamily: 'Sora_700Bold', fontSize: 18, lineHeight: 24, color: colors.text, letterSpacing: -0.2 },
   titleSm: { fontFamily: 'Sora_800ExtraBold', fontSize: 20, lineHeight: 26, color: colors.text, letterSpacing: -0.6 },
-  brandWordmark: { fontFamily: 'Sora_800ExtraBold', fontSize: 26, lineHeight: 30, letterSpacing: -0.8, color: colors.text },
+  brandWordmark: { fontFamily: 'Sora_800ExtraBold', fontSize: 26, lineHeight: 30, letterSpacing: 2.1, color: colors.text },
   body: { fontFamily: 'Sora_400Regular', fontSize: 15, lineHeight: 22, color: colors.text },
   bodyBold: { fontFamily: 'Sora_700Bold', fontSize: 15, lineHeight: 22, color: colors.text },
   bodyMuted: { fontFamily: 'Sora_500Medium', fontSize: 14, lineHeight: 20, color: colors.muted },

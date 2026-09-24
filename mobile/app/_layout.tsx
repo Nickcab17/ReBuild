@@ -24,7 +24,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <StatusBar style="dark" />
       <AuthProvider>
-        <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: '#1E8E5A', tabBarStyle: hideTabBar ? { display: 'none' } : undefined }}>
+        <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: '#23483A', tabBarInactiveTintColor: '#829B7A', tabBarStyle: hideTabBar ? { display: 'none' } : undefined }}>
           <Tabs.Screen name="index" options={{ title: 'Inicio' }} />
           <Tabs.Screen name="explore" options={{ title: 'Explorar' }} />
           <Tabs.Screen name="publish" options={{ title: 'Publicar' }} />
