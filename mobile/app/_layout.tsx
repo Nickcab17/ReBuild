@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 import { colors } from '../constants/theme';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { SymbolView } from 'expo-symbols';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -50,12 +50,12 @@ function AppTabs() {
 
   return (
         <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.primary, tabBarInactiveTintColor: colors.sage, tabBarStyle: hideTabBar ? { display: 'none' } : undefined }}>
-          <Tabs.Screen name="index" options={{ title: 'Inicio' }} />
-          <Tabs.Screen name="explore" options={{ title: 'Explorar' }} />
-          <Tabs.Screen name="publish" options={{ title: 'Publicar' }} />
-          <Tabs.Screen name="map" options={{ title: 'Mapa' }} />
-          <Tabs.Screen name="profile" options={{ title: 'Perfil' }} />
-          <Tabs.Screen name="conectar" options={{ title: 'Conectar', tabBarIcon: ({ color }) => <View style={{ width: 25, height: 23 }}><View style={{ position: 'absolute', left: 1, top: 1, width: 16, height: 14, borderColor: color, borderWidth: 2, borderRadius: 5 }} /><View style={{ position: 'absolute', right: 0, bottom: 0, width: 16, height: 14, borderColor: color, borderWidth: 2, borderRadius: 5, backgroundColor: colors.background }} /></View>, tabBarBadge: unreadCount > 0 ? unreadCount : undefined, tabBarBadgeStyle: { backgroundColor: colors.secondary, color: colors.white } }} />
+          <Tabs.Screen name="index" options={{ title: 'Inicio', tabBarIcon: ({ color }) => <SymbolView name={{ ios: 'house.fill', android: 'home', web: 'home' }} tintColor={color} size={24} /> }} />
+          <Tabs.Screen name="explore" options={{ title: 'Explorar', tabBarIcon: ({ color }) => <SymbolView name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} tintColor={color} size={24} /> }} />
+          <Tabs.Screen name="publish" options={{ title: 'Publicar', tabBarIcon: ({ color }) => <SymbolView name={{ ios: 'plus', android: 'add', web: 'add' }} tintColor={color} size={24} /> }} />
+          <Tabs.Screen name="map" options={{ title: 'Mapa', tabBarIcon: ({ color }) => <SymbolView name={{ ios: 'map.fill', android: 'map', web: 'map' }} tintColor={color} size={24} /> }} />
+          <Tabs.Screen name="profile" options={{ title: 'Perfil', tabBarIcon: ({ color }) => <SymbolView name={{ ios: 'person.crop.circle', android: 'person', web: 'person' }} tintColor={color} size={24} /> }} />
+          <Tabs.Screen name="conectar" options={{ title: 'Conectar', tabBarIcon: ({ color }) => <SymbolView name={{ ios: 'bubble.left.and.bubble.right', android: 'forum', web: 'forum' }} tintColor={color} size={24} />, tabBarBadge: unreadCount > 0 ? unreadCount : undefined, tabBarBadgeStyle: { backgroundColor: colors.secondary, color: colors.white } }} />
           <Tabs.Screen name="login" options={{ href: null }} />
           <Tabs.Screen name="register" options={{ href: null }} />
           <Tabs.Screen name="request" options={{ href: null }} />
