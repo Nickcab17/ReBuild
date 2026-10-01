@@ -29,7 +29,9 @@ export default function RequestScreen() {
     try {
       setLoading(true);
       await api.createRequest({ ...form, material: form.material.trim(), description: form.description.trim(), location: form.location.trim(), quantity, neededBy: form.neededBy ? new Date(form.neededBy).toISOString() : new Date(Date.now() + 604800000).toISOString() }, token);
-      Alert.alert('Solicitud creada', 'Buscaremos materiales que puedan ayudarte.', [{ text: 'Ver coincidencias', onPress: () => router.replace('/matches') }]);
+      const matches = await api.getMatches(token) as Array<{ id: string; reason?: string }>;
+      const hasMatches = Array.isArray(matches) && matches.length > 0;
+      Alert.alert(hasMatches ? '✨ Encontramos algo para ti' : 'Solicitud creada', hasMatches ? 'Hay una posible coincidencia cerca de ti. Revisa tus coincidencias.' : 'Buscaremos materiales que puedan ayudarte.', [{ text: hasMatches ? 'Ver coincidencias' : 'OK', onPress: () => router.replace('/matches') }]);
     } catch (error) {
       Alert.alert('No se pudo crear la solicitud', error instanceof Error ? error.message : 'Intenta nuevamente.');
     } finally {

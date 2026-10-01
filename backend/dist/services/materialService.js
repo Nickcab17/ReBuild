@@ -106,8 +106,8 @@ export function findMatchesForRequest(requestId) {
         const result = findMaterialMatches(`${material.name} ${material.description} ${material.category}`, `${request.material} ${request.description} ${request.category}`);
         const sameLocation = material.location.toLowerCase() === request.location.toLowerCase();
         const enoughQuantity = material.quantity >= request.quantity;
-        const score = Math.min(100, result.score + (enoughQuantity ? 10 : 0) + (sameLocation ? 10 : 0));
-        if (score < 40)
+        const score = Math.min(100, result.score + (enoughQuantity ? 8 : 0) + (sameLocation ? 8 : 0));
+        if (!result.compatible && score < 60)
             continue;
         const match = {
             id: createId('match'),
@@ -160,18 +160,20 @@ export function findMatchesForMaterial(materialId) {
     const matches = [];
     for (const request of requests) {
         const result = findMaterialMatches(`${material.name} ${material.description}`, `${request.material} ${request.description}`);
-        if (result.score >= 40) {
-            const match = {
-                id: createId('match'),
-                materialId: material.id,
-                requestId: request.id,
-                score: result.score,
-                reason: `Coincidencia por ${result.matches.join(', ') || result.suggestedCategory}`,
-                createdAt: new Date().toISOString(),
-            };
-            matches.push(match);
-            getStore().matches.set(match.id, match);
-        }
+        const score = Math.min(100, result.score + (material.location.toLowerCase() === request.location.toLowerCase() ? 8 : 0));
+        if (!result.compatible && score < 60)
+            continue;
+        const match = {
+            id: createId('match'),
+            materialId: material.id,
+            requestId: request.id,
+            score,
+            reason: `Coincidencia por ${result.matches.join(', ') || result.suggestedCategory}`,
+            createdAt: new Date().toISOString(),
+        };
+        matches.push(match);
+        getStore().matches.set(match.id, match);
+        persistItem('matches', match);
     }
     return matches;
 }

@@ -76,6 +76,25 @@ export interface Match {
   createdAt: string;
 }
 
+export interface Conversation {
+  id: string;
+  participantIds: string[];
+  matchId: string;
+  materialId: string;
+  requestId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Message {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  text: string;
+  createdAt: string;
+  readBy: string[];
+}
+
 export interface AuthPayload {
   userId: string;
   email: string;

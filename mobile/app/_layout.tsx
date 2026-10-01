@@ -4,10 +4,13 @@ import { useFonts } from 'expo-font';
 import { Sora_400Regular, Sora_500Medium, Sora_600SemiBold, Sora_700Bold, Sora_800ExtraBold } from '@expo-google-fonts/sora';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
+import { colors } from '../constants/theme';
+import { useEffect, useState } from 'react';
+import { View } from 'react-native';
 
 export default function RootLayout() {
-  const segments = useSegments();
-  const hideTabBar = segments.includes('login') || segments.includes('register') || segments.includes('material');
   const [fontsLoaded] = useFonts({
     Sora_400Regular,
     Sora_500Medium,
@@ -24,20 +27,42 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <StatusBar style="dark" />
       <AuthProvider>
-        <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: '#23483A', tabBarInactiveTintColor: '#829B7A', tabBarStyle: hideTabBar ? { display: 'none' } : undefined }}>
+        <AppTabs />
+      </AuthProvider>
+    </SafeAreaProvider>
+  );
+}
+
+function AppTabs() {
+  const segments = useSegments();
+  const { token } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+  const hideTabBar = segments.includes('login') || segments.includes('register') || segments.includes('material') || segments.includes('chat');
+
+  useEffect(() => {
+    if (!token) { setUnreadCount(0); return; }
+    let active = true;
+    api.getConversations(token).then((items) => {
+      if (active && Array.isArray(items)) setUnreadCount(items.reduce((total, item) => total + Number((item as { unreadCount?: number }).unreadCount ?? 0), 0));
+    }).catch(() => { if (active) setUnreadCount(0); });
+    return () => { active = false; };
+  }, [token, segments.join('/')]);
+
+  return (
+        <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.primary, tabBarInactiveTintColor: colors.sage, tabBarStyle: hideTabBar ? { display: 'none' } : undefined }}>
           <Tabs.Screen name="index" options={{ title: 'Inicio' }} />
           <Tabs.Screen name="explore" options={{ title: 'Explorar' }} />
           <Tabs.Screen name="publish" options={{ title: 'Publicar' }} />
           <Tabs.Screen name="map" options={{ title: 'Mapa' }} />
           <Tabs.Screen name="profile" options={{ title: 'Perfil' }} />
+          <Tabs.Screen name="conectar" options={{ title: 'Conectar', tabBarIcon: ({ color }) => <View style={{ width: 25, height: 23 }}><View style={{ position: 'absolute', left: 1, top: 1, width: 16, height: 14, borderColor: color, borderWidth: 2, borderRadius: 5 }} /><View style={{ position: 'absolute', right: 0, bottom: 0, width: 16, height: 14, borderColor: color, borderWidth: 2, borderRadius: 5, backgroundColor: colors.background }} /></View>, tabBarBadge: unreadCount > 0 ? unreadCount : undefined, tabBarBadgeStyle: { backgroundColor: colors.secondary, color: colors.white } }} />
           <Tabs.Screen name="login" options={{ href: null }} />
           <Tabs.Screen name="register" options={{ href: null }} />
           <Tabs.Screen name="request" options={{ href: null }} />
           <Tabs.Screen name="requests" options={{ href: null }} />
           <Tabs.Screen name="matches" options={{ href: null }} />
           <Tabs.Screen name="material/[id]" options={{ href: null }} />
+          <Tabs.Screen name="chat/[id]" options={{ href: null }} />
         </Tabs>
-      </AuthProvider>
-    </SafeAreaProvider>
   );
 }

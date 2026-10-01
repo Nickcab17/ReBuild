@@ -60,4 +60,29 @@ export interface MatchItem {
   score: number;
   reason: string;
   createdAt: string;
+  material?: Material;
+  request?: MaterialRequest;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  text: string;
+  createdAt: string;
+  readBy: string[];
+}
+
+export interface ConversationItem {
+  id: string;
+  participantIds: string[];
+  matchId: string;
+  materialId: string;
+  requestId: string;
+  createdAt: string;
+  updatedAt: string;
+  otherUser: { id: string; name: string; avatar?: string };
+  material?: Pick<Material, 'id' | 'name' | 'category'>;
+  lastMessage?: ChatMessage | null;
+  unreadCount?: number;
 }

@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { Favorite, Match, Material, MaterialRequest, User } from '../types.js';
+import type { Conversation, Favorite, Match, Material, MaterialRequest, Message, User } from '../types.js';
 
 const inMemory = {
   users: new Map<string, User>(),
@@ -7,6 +7,8 @@ const inMemory = {
   requests: new Map<string, MaterialRequest>(),
   favorites: new Map<string, Favorite>(),
   matches: new Map<string, Match>(),
+  conversations: new Map<string, Conversation>(),
+  messages: new Map<string, Message>(),
 };
 
 export function getStore() {

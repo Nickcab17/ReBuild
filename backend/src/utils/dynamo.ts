@@ -3,7 +3,7 @@ import { DeleteCommand, DynamoDBDocumentClient, PutCommand, ScanCommand } from '
 import { config } from '../config.js';
 import { getStore } from './store.js';
 
-type TableName = 'users' | 'materials' | 'requests' | 'favorites' | 'matches';
+type TableName = 'users' | 'materials' | 'requests' | 'favorites' | 'matches' | 'conversations' | 'messages';
 
 const client = config.dynamoEnabled ? DynamoDBDocumentClient.from(new DynamoDBClient({})) : null;
 const tableNames: Record<TableName, string> = {
@@ -12,6 +12,8 @@ const tableNames: Record<TableName, string> = {
   requests: `${config.dynamoTablePrefix}Requests`,
   favorites: `${config.dynamoTablePrefix}Favorites`,
   matches: `${config.dynamoTablePrefix}Matches`,
+  conversations: `${config.dynamoTablePrefix}Conversations`,
+  messages: `${config.dynamoTablePrefix}Messages`,
 };
 
 export function persistItem(table: TableName, item: Record<string, unknown>) {
@@ -42,4 +44,9 @@ export async function hydrateStore() {
 
 export function isDynamoEnabled() {
   return Boolean(client);
+}
+
+export async function persistItemAndWait(table: TableName, item: Record<string, unknown>) {
+  if (!client) return;
+  await client.send(new PutCommand({ TableName: tableNames[table], Item: item }));
 }

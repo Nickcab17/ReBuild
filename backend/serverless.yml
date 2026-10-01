@@ -89,6 +89,28 @@ resources:
         KeySchema:
           - AttributeName: id
             KeyType: HASH
+    RebuildConversations:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: RebuildConversations
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+    RebuildMessages:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: RebuildMessages
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
 
 plugins:
   - serverless-offline

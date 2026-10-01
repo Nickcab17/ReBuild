@@ -4,6 +4,7 @@ import { registerUser, loginUser, getCurrentUser, } from '../services/authServic
 import { addFavorite, classifyMaterialText, createMaterial, createRequest, deleteMaterial, findMatchesForMaterial, findMatchesForRequest, getMaterial, getMatchesForUser, listFavorites, listMaterials, listRequestsForUser, removeFavorite, searchMaterials, updateMaterial, } from '../services/materialService.js';
 import { getStore } from '../utils/store.js';
 import { persistItem } from '../utils/dynamo.js';
+import { analyzeMaterialImage } from '../services/visionService.js';
 export const apiRouter = Router();
 apiRouter.get('/health', (_req, res) => {
     res.json({ ok: true, service: 'Rebuild API', timestamp: new Date().toISOString() });
@@ -229,6 +230,18 @@ apiRouter.patch('/users/me', requireAuth, (req, res) => {
 apiRouter.post('/ai/classify-material', (req, res) => {
     const text = String(req.body?.text ?? '');
     res.json(classifyMaterialText(text));
+});
+apiRouter.post('/ai/analyze-material-image', async (req, res) => {
+    try {
+        const result = await analyzeMaterialImage(String(req.body?.imageDataUrl ?? ''));
+        if (result.status === 'not_configured')
+            return res.status(503).json(result);
+        return res.json(result);
+    }
+    catch (error) {
+        const message = error instanceof Error ? error.message : 'No se pudo analizar la imagen.';
+        return res.status(502).json({ message });
+    }
 });
 apiRouter.post('/ai/find-matches', (req, res) => {
     const materialText = String(req.body?.materialText ?? '');

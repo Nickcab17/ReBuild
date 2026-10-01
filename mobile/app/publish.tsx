@@ -87,7 +87,9 @@ export default function PublishScreen() {
     try {
       setLoading(true);
       const material = await api.createMaterial({ ...form, name: form.name.trim(), description: form.description.trim(), location: form.location.trim(), quantity, photos: photo ? [photo] : [] }, token) as { id: string };
-      Alert.alert('Material publicado', 'Tu material ya está disponible para la comunidad.', [{ text: 'Ver material', onPress: () => router.replace({ pathname: '/material/[id]', params: { id: material.id } }) }]);
+      const matches = await api.getMatches(token) as Array<{ id: string; reason?: string }>;
+      const hasMatches = Array.isArray(matches) && matches.length > 0;
+      Alert.alert(hasMatches ? '✨ Encontramos algo para ti' : 'Material publicado', hasMatches ? 'Hay una publicación que podría relacionarse con tu material.' : 'Tu material ya está disponible para la comunidad.', [{ text: hasMatches ? 'Ver coincidencias' : 'Ver material', onPress: () => hasMatches ? router.replace('/matches') : router.replace({ pathname: '/material/[id]', params: { id: material.id } }) }]);
     } catch (error) {
       Alert.alert('No se pudo publicar', error instanceof Error ? error.message : 'Intenta nuevamente.');
     } finally {

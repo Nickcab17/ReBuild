@@ -27,6 +27,7 @@ import {
 import { getStore } from '../utils/store.js';
 import { persistItem } from '../utils/dynamo.js';
 import { analyzeMaterialImage } from '../services/visionService.js';
+import { ConversationError, createConversationForMatch, getConversationMessages, listConversationsForUser, sendConversationMessage } from '../services/conversationService.js';
 
 export const apiRouter = Router();
 
@@ -193,7 +194,49 @@ apiRouter.post('/requests', requireAuth, (req: AuthRequest, res) => {
 });
 
 apiRouter.get('/matches', requireAuth, (req: AuthRequest, res) => {
-  res.json(getMatchesForUser(req.user!.userId));
+  const matches = getMatchesForUser(req.user!.userId);
+  res.json(matches.map((match) => ({
+    ...match,
+    material: getStore().materials.get(match.materialId),
+    request: getStore().requests.get(match.requestId),
+  })));
+});
+
+apiRouter.get('/conversations', requireAuth, (req: AuthRequest, res) => {
+  res.json(listConversationsForUser(req.user!.userId));
+});
+
+apiRouter.post('/conversations', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const conversation = await createConversationForMatch(String(req.body?.matchId ?? ''), req.user!.userId);
+    res.status(201).json(conversation);
+  } catch (error) {
+    const status = error instanceof ConversationError ? error.status : 400;
+    const message = error instanceof Error ? error.message : 'No se pudo abrir la conversación.';
+    res.status(status).json({ message });
+  }
+});
+
+apiRouter.get('/conversations/:id/messages', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const result = await getConversationMessages(req.params.id as string, req.user!.userId);
+    res.json(result);
+  } catch (error) {
+    const status = error instanceof ConversationError ? error.status : 400;
+    const message = error instanceof Error ? error.message : 'No se pudieron cargar los mensajes.';
+    res.status(status).json({ message });
+  }
+});
+
+apiRouter.post('/conversations/:id/messages', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const message = await sendConversationMessage(req.params.id as string, req.user!.userId, String(req.body?.text ?? ''));
+    res.status(201).json(message);
+  } catch (error) {
+    const status = error instanceof ConversationError ? error.status : 400;
+    const message = error instanceof Error ? error.message : 'No se pudo enviar el mensaje.';
+    res.status(status).json({ message });
+  }
 });
 
 apiRouter.post('/matches/:id/interest', requireAuth, (req: AuthRequest, res) => {

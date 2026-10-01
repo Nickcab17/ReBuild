@@ -2,12 +2,20 @@ import type { MatchItem, Material, MaterialRequest, User } from '../types';
 
 export const demoUsers: User[] = [
   {
+    id: 'u-demo-nico',
+    name: 'Nico',
+    email: 'nicocg1707@gmail.com',
+    city: 'Ciudad de México',
+    role: 'usuario',
+    createdAt: '2025-01-10T12:00:00.000Z',
+  },
+  {
     id: 'u-demo-ana',
     name: 'Ana García',
     email: 'ana@rebuild.dev',
     city: 'Ciudad de México',
     role: 'usuario',
-    createdAt: '2025-01-10T12:00:00.000Z',
+    createdAt: '2025-01-11T12:00:00.000Z',
   },
   {
     id: 'u-demo-luis',
@@ -187,5 +195,5 @@ export const demoMatches: MatchItem[] = [
 
 export const demoAuth = {
   token: 'demo-token-local',
-  password: 'secret123',
+  password: 'Nico200@',
 };

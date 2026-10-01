@@ -7,8 +7,8 @@ import { useAuth } from '../contexts/AuthContext';
 export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuth();
-  const [email, setEmail] = useState('ana@rebuild.dev');
-  const [password, setPassword] = useState('secret123');
+  const [email, setEmail] = useState('nicocg1707@gmail.com');
+  const [password, setPassword] = useState('Nico200@');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
