@@ -72,22 +72,11 @@ rebuild/
 
 ## Installation
 
-From the project root:
-
-```bash
-npm install
-```
-
-Then install the backend dependencies:
+The backend and mobile projects have separate package manifests. Install their dependencies from each project directory:
 
 ```bash
 cd backend
 npm install
-```
-
-Then install the mobile app dependencies:
-
-```bash
 cd ../mobile
 npm install
 ```
@@ -156,6 +145,20 @@ Start Expo Go:
 cd mobile
 npx expo start
 ```
+
+## Web demo (Vercel)
+
+From the repository root, install and start the existing Expo web demo:
+
+```bash
+cd mobile
+npm install
+npm run web
+```
+
+`npm run build` checks TypeScript and exports the web site to `mobile/dist`. For Vercel, set the project root directory to `mobile`; the included `vercel.json` configures the build and SPA route fallback. The web demo uses local sample data for matching and does not require an API URL or API keys. Its interactive Leaflet map uses OpenStreetMap tiles (with attribution), so the base map requires an internet connection but no paid map API key. Selected publication photos are kept in browser-local state/storage only; they are not uploaded to a server or shared between devices. Photos are visual context only: match ranking uses the publication descriptions and material attributes, not image recognition. Demo chat messages are temporary and are not persisted.
+
+The home feed's sample listing photos are bundled locally from Unsplash: [Grant Ritchie](https://unsplash.com/photos/QvTJYfO93-c) (ceramic tile), [Patrick Robert Doyle](https://unsplash.com/photos/yVRn-d6JGzo) (lumber), [Alejandro Barba](https://unsplash.com/photos/4b3SSh8XyN8) (construction blocks), and [Theme Photos](https://unsplash.com/photos/Cl-OpYWFFm0) (paint roller).
 
 ### Android Emulator
 Use:

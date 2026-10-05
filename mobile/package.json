@@ -7,11 +7,14 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && expo export --platform web"
   },
   "dependencies": {
     "@expo-google-fonts/dm-sans": "^0.4.2",
     "@expo-google-fonts/sora": "^0.4.2",
+    "@expo/metro-runtime": "~57.0.16",
     "expo": "~57.0.24",
     "expo-blob": "^57.0.2",
     "expo-camera": "~57.0.5",
@@ -22,13 +25,17 @@
     "expo-router": "~57.0.22",
     "expo-secure-store": "~57.0.4",
     "expo-status-bar": "~57.0.1",
+    "leaflet": "^1.9.4",
     "react": "19.2.3",
+    "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-maps": "1.27.2",
     "react-native-reanimated": "4.5.1",
-    "react-native-safe-area-context": "~5.7.0"
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-web": "^0.21.2"
   },
   "devDependencies": {
+    "@types/leaflet": "^1.9.22",
     "@types/react": "~19.2.0",
     "typescript": "~6.0.3"
   }
