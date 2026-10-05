@@ -22,7 +22,7 @@ export default function DemoChatScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const [text, setText] = useState('');
   const [messages, setMessages] = useState<DemoMessage[]>([
-    { id: 1, text: `¡Hola! Vi la coincidencia de ${material}. ¿Te gustaría conversar para coordinar?`, own: false, time: 'Ahora' },
+    { id: 1, text: `¡Hola! Me interesa ${material}. ¿Coordinamos?`, own: false, time: 'Ahora' },
   ]);
 
   useEffect(() => {
@@ -44,7 +44,7 @@ export default function DemoChatScreen() {
   return (
     <KeyboardAvoidingView style={styles.screen}>
       <View style={styles.topBar}>
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver a la demo" onPress={goBack} style={styles.backButton}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver a ReBuild" onPress={goBack} style={styles.backButton}>
           <Text style={styles.backArrow}>‹</Text>
         </TouchableOpacity>
         <View style={styles.avatar}><Text style={styles.avatarText}>{person.slice(0, 1).toUpperCase()}</Text></View>

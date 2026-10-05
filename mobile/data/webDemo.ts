@@ -12,6 +12,7 @@ export interface DemoPublication {
   condition: string;
   location: string;
   owner: string;
+  ownerId?: string;
   description: string;
   photoUri?: string;
   latitude?: number;
@@ -21,6 +22,15 @@ export interface DemoPublication {
 export interface DemoMatch {
   publication: DemoPublication;
   score: number;
+  level: 'Alta coincidencia' | 'Coincidencia parcial';
+  criteria: {
+    material: 'match';
+    type: 'match' | 'mismatch';
+    quantity: 'match' | 'partial' | 'mismatch';
+    unit: 'match' | 'mismatch';
+    condition: 'match' | 'mismatch';
+    location: 'match' | 'mismatch';
+  };
   reason: string;
 }
 
@@ -285,6 +295,20 @@ function materialKey(publication: Pick<DemoPublication, 'material' | 'type' | 'd
   return keyFor(publication.material) ?? keyFor(publication.type) ?? keyFor(publication.description);
 }
 
+function materialsAreCompatible(first: DemoPublication, second: DemoPublication) {
+  const firstKey = materialKey(first);
+  const secondKey = materialKey(second);
+  if (firstKey || secondKey) return firstKey !== null && firstKey === secondKey;
+
+  const firstName = normalize(first.material);
+  const secondName = normalize(second.material);
+  if (firstName === secondName || firstName.includes(secondName) || secondName.includes(firstName)) return true;
+
+  const ignoredWords = new Set(['material', 'tengo', 'necesito', 'busco', 'ofrezco', 'sobrante', 'estado']);
+  const firstWords = new Set(firstName.split(' ').filter((word) => word.length >= 3 && !ignoredWords.has(word)));
+  return secondName.split(' ').some((word) => firstWords.has(word));
+}
+
 function locationCompatibility(first: string, second: string) {
   const a = normalize(first);
   const b = normalize(second);
@@ -305,35 +329,58 @@ function conditionCompatibility(first: string, second: string) {
 }
 
 function compatibility(publication: DemoPublication, candidate: DemoPublication): DemoMatch | null {
-  const materialMatches = materialKey(publication) !== null && materialKey(publication) === materialKey(candidate);
+  const materialMatches = materialsAreCompatible(publication, candidate);
   const typeMatches = normalize(publication.type) === normalize(candidate.type);
-  if ((!materialMatches && !typeMatches) || normalizeUnit(publication.unit) !== normalizeUnit(candidate.unit)) return null;
+  if (!materialMatches) return null;
 
   const need = publication.intent === 'need' ? publication : candidate;
   const offer = publication.intent === 'offer' ? publication : candidate;
-  const quantityRatio = Math.min(offer.quantity, need.quantity) / Math.max(offer.quantity, need.quantity);
-  const enoughQuantity = offer.quantity >= need.quantity;
+  const unitMatches = normalizeUnit(offer.unit) === normalizeUnit(need.unit);
+  const quantityRatio = unitMatches
+    ? Math.min(offer.quantity / need.quantity, 1)
+    : 0;
+  const enoughQuantity = unitMatches && offer.quantity >= need.quantity;
   const sameLocation = locationCompatibility(publication.location, candidate.location);
   const condition = conditionCompatibility(publication.condition, candidate.condition);
-  const typeScore = typeMatches ? 15 : 0;
-  const materialScore = materialMatches ? 40 : 20;
-  const quantityScore = enoughQuantity ? 20 : Math.round(quantityRatio * 20);
-  const score = materialScore + typeScore + quantityScore + condition + sameLocation;
+  const conditionMatches = condition >= 8;
+  const locationMatches = sameLocation >= 11;
+  const quantityState = !unitMatches ? 'mismatch' : enoughQuantity ? 'match' : 'partial';
+  const score = 40
+    + (typeMatches ? 20 : 0)
+    + (unitMatches ? 10 : 0)
+    + (unitMatches ? Math.round(quantityRatio * 15) : 0)
+    + (conditionMatches ? 10 : 0)
+    + (locationMatches ? 5 : 0);
   const reasons = [
-    materialMatches ? 'material compatible' : 'tipo de material compatible',
+    'material compatible',
     typeMatches ? 'tipo coincidente' : '',
-    enoughQuantity ? 'cantidad suficiente' : `cubre ${Math.round(quantityRatio * 100)}% de la cantidad`,
-    condition >= 8 ? 'condición compatible' : '',
-    sameLocation >= 11 ? 'misma zona de CDMX' : '',
+    !unitMatches ? 'unidad distinta' : enoughQuantity ? 'cantidad suficiente' : `cubre ${Math.round(quantityRatio * 100)}% de la cantidad`,
+    conditionMatches ? 'condición compatible' : '',
+    locationMatches ? 'ubicación cercana' : '',
   ].filter(Boolean);
 
-  return { publication: candidate, score, reason: reasons.join(' · ') };
+  return {
+    publication: candidate,
+    score,
+    level: score >= 90 ? 'Alta coincidencia' : 'Coincidencia parcial',
+    criteria: {
+      material: 'match',
+      type: typeMatches ? 'match' : 'mismatch',
+      quantity: quantityState,
+      unit: unitMatches ? 'match' : 'mismatch',
+      condition: conditionMatches ? 'match' : 'mismatch',
+      location: locationMatches ? 'match' : 'mismatch',
+    },
+    reason: reasons.join(' · '),
+  };
 }
 
 export function findDemoMatches(publication: DemoPublication, publications = webDemoPublications) {
   const oppositeIntent = publication.intent === 'need' ? 'offer' : 'need';
   return publications
-    .filter((candidate) => candidate.intent === oppositeIntent)
+    .filter((candidate) => candidate.intent === oppositeIntent
+      && candidate.id !== publication.id
+      && (!publication.ownerId || candidate.ownerId !== publication.ownerId))
     .map((candidate) => compatibility(publication, candidate))
     .filter((match): match is DemoMatch => match !== null)
     .sort((a, b) => b.score - a.score)

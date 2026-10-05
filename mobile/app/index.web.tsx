@@ -7,8 +7,9 @@ import { AppHeader, BrandLogo, PrimaryButton } from '../components/Branding';
 import { CategoryChip, EmptyState, materialPlaceholder } from '../components/RebuildUI';
 import { colors, categories, radius, shadows, typography } from '../constants/theme';
 import { findDemoMatches, readSavedDemoPublications, webDemoPublications, WEB_DEMO_PUBLICATIONS_STORAGE_KEY, coordinatesForLocation, type DemoMatch, type DemoPublication, type PublicationIntent } from '../data/webDemo';
+import { clearDemoSession, readDemoAccounts, readDemoSession, saveDemoSession, WEB_DEMO_ACCOUNTS_STORAGE_KEY, type DemoAccount } from '../data/webAuth';
 
-type Stage = 'home' | 'publish' | 'explore' | 'matches' | 'detail' | 'connect';
+type Stage = 'home' | 'publish' | 'explore' | 'matches' | 'detail' | 'connect' | 'login' | 'register' | 'profile';
 type PublicationForm = Omit<DemoPublication, 'id' | 'owner' | 'intent' | 'quantity'> & { quantity: string };
 
 const emptyForm: PublicationForm = {
@@ -76,6 +77,11 @@ function demoReason(match: DemoMatch) {
     .replace('misma zona de CDMX', 'misma ubicación aproximada');
 }
 
+function matchCriteria(match: DemoMatch) {
+  const symbol = (status: 'match' | 'partial' | 'mismatch') => status === 'match' ? '✓' : status === 'partial' ? '~' : '—';
+  return `Material ${symbol(match.criteria.material)} · Tipo ${symbol(match.criteria.type)} · Cantidad ${symbol(match.criteria.quantity)} · Unidad ${symbol(match.criteria.unit)} · Condición ${symbol(match.criteria.condition)} · Ubicación ${symbol(match.criteria.location)}`;
+}
+
 export default function WebDemoHome() {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -93,6 +99,11 @@ export default function WebDemoHome() {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [error, setError] = useState('');
+  const [currentUser, setCurrentUser] = useState<DemoAccount | null>(null);
+  const [authName, setAuthName] = useState('');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState('');
 
   const visibleOffers = useMemo(() => [...localPublications.filter((publication) => publication.intent === 'offer').reverse(), ...demoOffers].filter((offer) => {
     const matchesSearch = `${offer.material} ${offer.type} ${offer.description} ${offer.location}`
@@ -100,12 +111,31 @@ export default function WebDemoHome() {
       .includes(search.trim().toLowerCase());
     return matchesSearch && (selectedCategory === 'Todos' || displayCategory(offer) === selectedCategory);
   }), [localPublications, search, selectedCategory]);
+  const myPublications = useMemo(
+    () => currentUser ? localPublications.filter((publication) => publication.ownerId === currentUser.id) : [],
+    [currentUser, localPublications],
+  );
+  const myMatches = useMemo(() => {
+    if (!currentUser) return [];
+    const candidates = [...webDemoPublications, ...localPublications];
+    return myPublications.flatMap((source) =>
+      findDemoMatches(source, candidates).map((match) => ({ source, match })),
+    );
+  }, [currentUser, localPublications, myPublications]);
 
   useEffect(() => {
     try {
       setLocalPublications(readSavedDemoPublications());
     } catch {
       setPublicationNotice('No se pudieron leer las publicaciones guardadas en este navegador.');
+    }
+    try {
+      const savedSession = readDemoSession();
+      const account = savedSession ? readDemoAccounts().find((saved) => saved.id === savedSession) : undefined;
+      if (account) setCurrentUser(account);
+      else if (savedSession) clearDemoSession();
+    } catch {
+      setAuthError('No se pudo recuperar la sesión guardada.');
     }
   }, []);
 
@@ -121,6 +151,94 @@ export default function WebDemoHome() {
     setError('');
     setPhotoError('');
     setStage('publish');
+  };
+
+  const openAuth = (nextStage: 'login' | 'register') => {
+    setAuthName('');
+    setAuthEmail('');
+    setAuthPassword('');
+    setAuthError('');
+    setStage(nextStage);
+  };
+
+  const register = () => {
+    const name = authName.trim();
+    const email = authEmail.trim();
+    const normalizedEmail = email.toLowerCase();
+    if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !authPassword) {
+      setAuthError('Completa nombre, correo válido y contraseña.');
+      return;
+    }
+
+    try {
+      const accounts = readDemoAccounts();
+      if (accounts.some((account) => account.email.toLowerCase() === normalizedEmail)) {
+        setAuthError('Ya existe una cuenta con ese correo.');
+        return;
+      }
+      const account: DemoAccount = {
+        id: `user-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        name,
+        email,
+        password: authPassword,
+      };
+      window.localStorage.setItem(WEB_DEMO_ACCOUNTS_STORAGE_KEY, JSON.stringify([...accounts, account]));
+      saveDemoSession(account.id);
+      setCurrentUser(account);
+      setAuthError('');
+      setStage('profile');
+    } catch {
+      setAuthError('No se pudo guardar la cuenta en este navegador.');
+    }
+  };
+
+  const login = () => {
+    if (!authEmail.trim() || !authPassword) {
+      setAuthError('Escribe tu correo y contraseña.');
+      return;
+    }
+    try {
+      const account = readDemoAccounts().find((saved) =>
+        saved.email.toLowerCase() === authEmail.trim().toLowerCase() && saved.password === authPassword,
+      );
+      if (!account) {
+        setAuthError('Correo o contraseña incorrectos.');
+        return;
+      }
+      saveDemoSession(account.id);
+      setCurrentUser(account);
+      setAuthError('');
+      setStage('profile');
+    } catch {
+      setAuthError('No se pudo iniciar sesión en este navegador.');
+    }
+  };
+
+  const logout = () => {
+    try {
+      clearDemoSession();
+      setCurrentUser(null);
+      setStage('home');
+    } catch {
+      setAuthError('No se pudo cerrar la sesión.');
+    }
+  };
+
+  const openProfileMatch = (source: DemoPublication, match: DemoMatch) => {
+    setIntent(source.intent);
+    setForm({
+      material: source.material,
+      type: source.type,
+      quantity: String(source.quantity),
+      unit: source.unit,
+      condition: source.condition,
+      location: source.location,
+      description: source.description,
+      photoUri: source.photoUri,
+    });
+    setCategory(displayCategory(source));
+    setSelectedMatch(match);
+    setStage('detail');
   };
 
   const selectPhoto = async () => {
@@ -168,7 +286,8 @@ export default function WebDemoHome() {
       description: form.description.trim(),
       id: publicationId,
       intent,
-      owner: 'Tú',
+      owner: currentUser?.name ?? 'Tú',
+      ownerId: currentUser?.id ?? 'guest',
       ...coordinatesForLocation(form.location.trim(), publicationId),
     };
     const nextPublications = [...localPublications.filter((saved) => saved.id !== publication.id), publication];
@@ -222,6 +341,7 @@ export default function WebDemoHome() {
     { label: 'Publicar', icon: { ios: 'plus', android: 'add', web: 'add' }, target: 'publish' },
     { label: 'Mapa', icon: { ios: 'map.fill', android: 'map', web: 'map' }, target: 'map' },
     { label: 'Conectar', icon: { ios: 'bubble.left.and.bubble.right', android: 'forum', web: 'forum' }, target: 'connect' },
+    { label: 'Perfil', icon: { ios: 'person.crop.circle', android: 'person', web: 'person' }, target: 'profile' },
   ] as const;
 
   const selectTab = (target: Stage | 'map') => {
@@ -233,7 +353,6 @@ export default function WebDemoHome() {
   const topHeader = (
     <View style={[styles.screenHeader, desktop && styles.screenHeaderDesktop]}>
       <BrandLogo compact />
-      <Text style={styles.eventLabel}>NAUFest 2026 · #AIForImpact</Text>
     </View>
   );
 
@@ -242,7 +361,7 @@ export default function WebDemoHome() {
       <View style={styles.homeHeaderCard}>
         <BrandLogo compact />
         <Text style={styles.homeTitle}>Tú describes. La IA conecta.</Text>
-        <Text style={styles.homeSubtitle}>ReBuild conecta materiales de construcción que todavía tienen vida útil con las personas que los necesitan.</Text>
+        <Text style={styles.homeSubtitle}>ReBuild conecta materiales reutilizables con quienes los necesitan.</Text>
         <Text style={styles.homeHint}>PUBLICA → ENCUENTRA → CONECTA</Text>
         <TextInput
           value={search}
@@ -280,6 +399,14 @@ export default function WebDemoHome() {
         <TouchableOpacity accessibilityRole="button" onPress={() => setStage('matches')}><Text style={styles.linkText}>Coincidencias</Text></TouchableOpacity>
         <TouchableOpacity accessibilityRole="button" onPress={() => setStage('connect')}><Text style={styles.linkText}>Conectar</Text></TouchableOpacity>
         <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/map')}><Text style={styles.linkText}>Mapa</Text></TouchableOpacity>
+        {currentUser ? (
+          <TouchableOpacity accessibilityRole="button" onPress={() => setStage('profile')}><Text style={styles.linkText}>Perfil</Text></TouchableOpacity>
+        ) : (
+          <>
+            <TouchableOpacity accessibilityRole="button" onPress={() => openAuth('register')}><Text style={styles.linkText}>Crear cuenta</Text></TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" onPress={() => openAuth('login')}><Text style={styles.linkText}>Iniciar sesión</Text></TouchableOpacity>
+          </>
+        )}
       </View>
 
       <Text style={[styles.sectionTitle, styles.recentTitle]}>Publicaciones recientes</Text>
@@ -302,9 +429,8 @@ export default function WebDemoHome() {
 
       <View style={styles.aiCard}>
         <Text style={styles.sectionTitle}>¿Cómo conecta la IA?</Text>
-        <Text style={styles.aiDescription}>Analiza las publicaciones, compara sus características y prioriza las coincidencias que mejor responden a cada necesidad.</Text>
-        <Text style={styles.aiSteps}>INTERPRETA → COMPARA → CALCULA COMPATIBILIDAD → PRIORIZA</Text>
-        <Text style={styles.aiNote}>Considera material, tipo, cantidad, condición y ubicación. No identifica materiales mediante fotografías.</Text>
+        <Text style={styles.aiDescription}>Compara material, tipo, cantidad, condición y ubicación para priorizar coincidencias.</Text>
+        <Text style={styles.aiNote}>La foto complementa la publicación; no identifica materiales.</Text>
       </View>
     </>
   );
@@ -313,7 +439,7 @@ export default function WebDemoHome() {
     <>
       {topHeader}
       <Text style={styles.screenTitle}>Publicar material</Text>
-      <Text style={styles.screenSubtitle}>Describe tu material y agrega una foto para que la comunidad pueda verlo.</Text>
+      <Text style={styles.screenSubtitle}>Describe el material y su estado.</Text>
       <View style={styles.intentRow}>
         <CategoryChip label="Tengo un material" active={intent === 'offer'} onPress={() => setIntent('offer')} />
         <CategoryChip label="Necesito un material" active={intent === 'need'} onPress={() => setIntent('need')} />
@@ -339,7 +465,7 @@ export default function WebDemoHome() {
         <Text style={styles.photoPickerText}>Elige una imagen desde tu computadora</Text>
       </TouchableOpacity>
       )}
-      <Text style={styles.photoNote}>La foto complementa la publicación; la IA compara las descripciones para encontrar coincidencias.</Text>
+      <Text style={styles.photoNote}>La foto complementa la publicación; las coincidencias se basan en el texto.</Text>
       {photoError ? <Text accessibilityRole="alert" style={styles.error}>{photoError}</Text> : null}
 
       <Text style={styles.label}>Material *</Text>
@@ -409,7 +535,7 @@ export default function WebDemoHome() {
         {['Todos', ...categories].map((item) => <CategoryChip key={item} label={item} active={selectedCategory === item} onPress={() => setSelectedCategory(item)} />)}
       </ScrollView>
       {visibleOffers.length === 0 ? (
-        <EmptyState title="No encontramos materiales" message="Prueba cambiando la búsqueda o la categoría." />
+        <EmptyState title="No encontramos materiales" message="Prueba otra búsqueda o categoría." />
       ) : visibleOffers.map((offer) => (
         <TouchableOpacity key={offer.id} activeOpacity={0.9} onPress={() => openListing(offer)} style={styles.materialCard}>
           <Image source={publicationPhoto(offer) ?? { uri: materialPlaceholder(offer.material.slice(0, 14), colors.terracotta) }} resizeMode="cover" style={styles.materialImage} />
@@ -431,7 +557,7 @@ export default function WebDemoHome() {
     <>
       {topHeader}
       <Text style={styles.screenTitle}>Coincidencias</Text>
-      <Text style={styles.screenSubtitle}>La IA prioriza las publicaciones que mejor se relacionan con lo que describes.</Text>
+      <Text style={styles.screenSubtitle}>Coincidencias priorizadas por compatibilidad.</Text>
       {publicationNotice ? <Text accessibilityRole="alert" style={styles.matchNotice}>{publicationNotice}</Text> : null}
       <View style={styles.matchList}>
         {matches.length ? matches.map((match) => (
@@ -440,13 +566,16 @@ export default function WebDemoHome() {
             {publicationPhoto(match.publication) ? <Image source={publicationPhoto(match.publication)!} resizeMode="cover" style={styles.matchPhoto} /> : null}
             <Text style={styles.matchName}>{match.publication.material}</Text>
             <Text style={styles.matchMeta}>{intent === 'offer' ? 'Oferta publicada' : 'Necesidad detectada'}: {form.material}</Text>
+            <Text style={styles.matchMeta}>Tipo: {match.publication.type}</Text>
             <Text style={styles.matchMeta}>{match.publication.quantity} {match.publication.unit} · {match.publication.location}</Text>
             <Text style={styles.matchMeta}>Condición: {match.publication.condition}</Text>
+            <Text style={styles.matchReason}>{match.score}% · {match.level}</Text>
+            <Text style={styles.matchMeta}>{matchCriteria(match)}</Text>
             <Text style={styles.matchReason}>{demoReason(match)}</Text>
             <PrimaryButton title="Ver detalle" onPress={() => openDetail(match)} style={styles.matchButton} />
           </View>
         )) : (
-          <EmptyState title="Todavía no hay coincidencias" message="Describe un material para encontrar ofertas y solicitudes compatibles." action={<PrimaryButton title="Publicar una descripción" onPress={() => setStage('publish')} style={styles.matchButton} />} />
+          <EmptyState title="Todavía no hay coincidencias" message="Describe lo que tienes o necesitas para encontrar coincidencias." action={<PrimaryButton title="Publicar una descripción" onPress={() => setStage('publish')} style={styles.matchButton} />} />
         )}
       </View>
     </>
@@ -460,8 +589,9 @@ export default function WebDemoHome() {
     const offer = intent === 'offer'
       ? { material: form.material, type: form.type, quantity: form.quantity, unit: form.unit, condition: form.condition, location: form.location, photoUri: form.photoUri }
       : selectedMatch.publication;
-    const covered = Math.min(Number(need.quantity), Number(offer.quantity));
-    const enough = Number(offer.quantity) >= Number(need.quantity);
+    const unitsMatch = selectedMatch.criteria.unit === 'match';
+    const covered = unitsMatch ? Math.min(Number(need.quantity), Number(offer.quantity)) : 0;
+    const enough = unitsMatch && Number(offer.quantity) >= Number(need.quantity);
     const needPhoto = publicationPhoto(need);
     const offerPhoto = publicationPhoto(offer);
 
@@ -497,11 +627,14 @@ export default function WebDemoHome() {
         <View style={styles.reasonCard}>
           <Text style={styles.reasonTitle}>Por qué coincide</Text>
           <Text style={styles.reasonLine}>• Material compatible: {need.material}.</Text>
-          <Text style={styles.reasonLine}>• Tipo de material: {need.type}.</Text>
-          <Text style={styles.reasonLine}>• Cantidad compatible: {covered} de {need.quantity} {need.unit}{enough ? ' disponibles.' : ` (${Math.round((covered / Number(need.quantity)) * 100)}% cubierto).`}</Text>
-          <Text style={styles.reasonLine}>• Condición: {offer.condition}.</Text>
-          <Text style={styles.reasonLine}>• Ubicación: {offer.location}.</Text>
-          <Text style={styles.compatibility}>Compatibilidad priorizada · {selectedMatch.score}%</Text>
+          <Text style={styles.reasonLine}>{selectedMatch.criteria.type === 'match' ? '• Tipo coincidente.' : '• El tipo difiere; el material es compatible.'}</Text>
+          <Text style={styles.reasonLine}>{unitsMatch
+            ? `• Cantidad: ${covered} de ${need.quantity} ${need.unit}${enough ? ' disponibles.' : ` (${Math.round((covered / Number(need.quantity)) * 100)}% cubierto).`}`
+            : `• Unidades distintas: ${need.unit} y ${offer.unit}; cantidades no comparables.`}</Text>
+          <Text style={styles.reasonLine}>• Condición: {offer.condition} ({selectedMatch.criteria.condition === 'match' ? 'compatible' : 'diferente'}).</Text>
+          <Text style={styles.reasonLine}>• Ubicación: {offer.location} ({selectedMatch.criteria.location === 'match' ? 'cercana' : 'distinta'}).</Text>
+          <Text style={styles.compatibility}>{selectedMatch.score}% · {selectedMatch.level}</Text>
+          <Text style={styles.reasonLine}>{matchCriteria(selectedMatch)}</Text>
         </View>
         <PrimaryButton title="Contactar" onPress={() => contact(selectedMatch.publication)} style={styles.submitButton} />
         <TouchableOpacity accessibilityRole="button" onPress={() => setStage('matches')} style={styles.backLink}>
@@ -513,11 +646,11 @@ export default function WebDemoHome() {
 
   const connectScreen = () => (
     <>
-      <AppHeader title="Conectar" subtitle="Conversaciones nacidas de coincidencias de materiales." />
+      <AppHeader title="Conectar" subtitle="Conversaciones sobre materiales." />
       {activeChats.length === 0 ? (
         <EmptyState
           title="Aún no tienes conversaciones"
-          message="Cuando contactes desde una coincidencia, el chat aparecerá aquí."
+          message="Contacta desde una coincidencia para iniciar un chat."
           action={<PrimaryButton title="Ver coincidencias" onPress={() => setStage('matches')} style={styles.matchButton} />}
         />
       ) : activeChats.map((chat) => (
@@ -533,6 +666,100 @@ export default function WebDemoHome() {
     </>
   );
 
+  const authScreen = (mode: 'login' | 'register') => (
+    <>
+      {topHeader}
+      <Text style={styles.screenTitle}>{mode === 'register' ? 'Crear cuenta' : 'Iniciar sesión'}</Text>
+      <Text style={styles.screenSubtitle}>{mode === 'register' ? 'Crea una cuenta para guardar tus publicaciones.' : 'Entra a tu cuenta de ReBuild.'}</Text>
+      {mode === 'register' ? (
+        <>
+          <Text style={styles.label}>Nombre *</Text>
+          <TextInput value={authName} onChangeText={setAuthName} placeholder="Tu nombre" style={styles.input} placeholderTextColor={colors.muted} autoCapitalize="words" />
+        </>
+      ) : null}
+      <Text style={styles.label}>Correo electrónico *</Text>
+      <TextInput value={authEmail} onChangeText={setAuthEmail} placeholder="correo@ejemplo.com" style={styles.input} placeholderTextColor={colors.muted} keyboardType="email-address" autoCapitalize="none" />
+      <Text style={styles.label}>Contraseña *</Text>
+      <TextInput value={authPassword} onChangeText={setAuthPassword} placeholder="Contraseña" style={styles.input} placeholderTextColor={colors.muted} secureTextEntry />
+      {authError ? <Text accessibilityRole="alert" style={styles.error}>{authError}</Text> : null}
+      <PrimaryButton title={mode === 'register' ? 'Crear cuenta' : 'Iniciar sesión'} onPress={mode === 'register' ? register : login} style={styles.submitButton} />
+      <TouchableOpacity accessibilityRole="button" onPress={() => openAuth(mode === 'register' ? 'login' : 'register')} style={styles.backLink}>
+        <Text style={styles.linkText}>{mode === 'register' ? '¿Ya tienes cuenta? Inicia sesión' : '¿Primera vez? Crear cuenta'}</Text>
+      </TouchableOpacity>
+    </>
+  );
+
+  const profileScreen = () => {
+    if (!currentUser) {
+      return (
+        <>
+          {topHeader}
+          <Text style={styles.screenTitle}>Perfil</Text>
+          <Text style={styles.screenSubtitle}>Inicia sesión para ver tus publicaciones y coincidencias.</Text>
+          <PrimaryButton title="Iniciar sesión" onPress={() => openAuth('login')} style={styles.submitButton} />
+          <TouchableOpacity accessibilityRole="button" onPress={() => openAuth('register')} style={styles.backLink}>
+            <Text style={styles.linkText}>Crear cuenta</Text>
+          </TouchableOpacity>
+        </>
+      );
+    }
+
+    return (
+      <>
+        {topHeader}
+        <Text style={styles.screenTitle}>Perfil</Text>
+        <View style={styles.detailCard}>
+          <Text style={styles.detailTitle}>{currentUser.name}</Text>
+          <Text style={styles.detailValue}>{currentUser.email}</Text>
+        </View>
+
+        <Text style={[styles.sectionTitle, styles.recentTitle]}>Mis publicaciones · {myPublications.filter((publication) => publication.intent === 'offer').length}</Text>
+        {myPublications.some((publication) => publication.intent === 'offer') ? myPublications.filter((publication) => publication.intent === 'offer').map((publication) => (
+          <View key={publication.id} style={styles.matchCard}>
+            <Text style={styles.matchName}>{publication.material}</Text>
+            <Text style={styles.matchMeta}>Ofreces · {publication.quantity} {publication.unit} · {publication.location}</Text>
+          </View>
+        )) : (
+          <EmptyState title="Aún no ofreces materiales" message="Publica un material disponible." action={<PrimaryButton title="Publicar material" onPress={() => startPublish('offer')} style={styles.matchButton} />} />
+        )}
+
+        <Text style={[styles.sectionTitle, styles.recentTitle]}>Mis solicitudes · {myPublications.filter((publication) => publication.intent === 'need').length}</Text>
+        {myPublications.some((publication) => publication.intent === 'need') ? myPublications.filter((publication) => publication.intent === 'need').map((publication) => (
+          <View key={publication.id} style={styles.matchCard}>
+            <Text style={styles.matchName}>{publication.material}</Text>
+            <Text style={styles.matchMeta}>Buscas · {publication.quantity} {publication.unit} · {publication.location}</Text>
+          </View>
+        )) : (
+          <EmptyState title="Aún no tienes solicitudes" message="Publica lo que necesitas." action={<PrimaryButton title="Publicar solicitud" onPress={() => startPublish('need')} style={styles.matchButton} />} />
+        )}
+
+        <Text style={[styles.sectionTitle, styles.recentTitle]}>Mis coincidencias · {myMatches.length}</Text>
+        {myMatches.length ? myMatches.map(({ source, match }) => {
+          const ownNeed = source.intent === 'need';
+          return (
+            <View key={`${source.id}:${match.publication.id}`} style={styles.matchCard}>
+              <Text style={styles.matchName}>{source.material}</Text>
+              <Text style={styles.matchMeta}>{ownNeed ? `Buscas: ${source.material}` : `Ofreces: ${source.material}`}</Text>
+              <Text style={styles.matchMeta}>{ownNeed ? 'Ofrece' : 'Busca'}: {match.publication.material}</Text>
+              <Text style={styles.matchMeta}>{source.location} · {match.publication.location}</Text>
+              <Text style={styles.matchReason}>{match.score}% · {match.level}</Text>
+              <Text style={styles.matchMeta}>{matchCriteria(match)}</Text>
+              <View style={styles.quickActions}>
+                <PrimaryButton title="Ver detalle" onPress={() => openProfileMatch(source, match)} style={styles.matchButton} />
+                <TouchableOpacity accessibilityRole="button" onPress={() => contact(match.publication)} style={styles.quickSecondary}>
+                  <Text style={styles.quickSecondaryText}>Contactar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        }) : (
+          <EmptyState title="Aún no hay coincidencias" message="Publica lo que tienes o necesitas para encontrar compatibilidades." />
+        )}
+        <PrimaryButton title="Cerrar sesión" onPress={logout} style={styles.submitButton} />
+      </>
+    );
+  };
+
   const currentScreen = () => {
     switch (stage) {
       case 'publish': return publishScreen();
@@ -540,6 +767,9 @@ export default function WebDemoHome() {
       case 'matches': return matchesScreen();
       case 'detail': return detailScreen();
       case 'connect': return connectScreen();
+      case 'login': return authScreen('login');
+      case 'register': return authScreen('register');
+      case 'profile': return profileScreen();
       default: return homeScreen();
     }
   };
@@ -583,7 +813,6 @@ const styles = StyleSheet.create({
   contentDesktop: { maxWidth: 860, alignSelf: 'center', paddingHorizontal: 28 },
   screenHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   screenHeaderDesktop: { paddingTop: 4 },
-  eventLabel: { ...typography.small, color: colors.secondary, fontSize: 10, textAlign: 'right' },
   homeHeaderCard: { backgroundColor: colors.surface, borderRadius: 24, padding: 20, marginBottom: 20, ...shadows.soft },
   homeTitle: { ...typography.h2, marginTop: 14 },
   homeSubtitle: { ...typography.bodyMuted, marginTop: 6 },
@@ -611,7 +840,6 @@ const styles = StyleSheet.create({
   materialDescription: { color: colors.text, fontFamily: 'Sora_400Regular', fontSize: 14, marginTop: 8 },
   aiCard: { marginTop: 8, marginBottom: 18, padding: 18, borderRadius: radius.xl, backgroundColor: colors.surface, ...shadows.card },
   aiDescription: { ...typography.bodyMuted, marginTop: 8 },
-  aiSteps: { ...typography.label, color: colors.primary, fontSize: 11, lineHeight: 21, marginTop: 14 },
   aiNote: { ...typography.small, marginTop: 10 },
   screenTitle: { ...typography.h2, marginTop: 8 },
   screenSubtitle: { ...typography.bodyMuted, marginTop: 6, marginBottom: 12 },

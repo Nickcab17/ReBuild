@@ -53,7 +53,7 @@ export default function MapScreen() {
     try {
       setPublications([...webDemoPublications, ...readSavedDemoPublications()]);
     } catch {
-      setStorageError('No se pudieron leer todas las publicaciones guardadas. Mostramos los materiales de demostración.');
+      setStorageError('No se pudieron leer algunas publicaciones guardadas.');
     }
   }, []);
 
@@ -135,7 +135,7 @@ export default function MapScreen() {
       <View style={styles.body}>
         <Text style={styles.eyebrow}>MAPA DE LA COMUNIDAD</Text>
         <Text style={styles.title}>Materiales cerca de proyectos en CDMX.</Text>
-        <Text style={styles.subtitle}>Explora ofertas y necesidades con ubicaciones aproximadas. No solicitamos ni rastreamos tu ubicación.</Text>
+        <Text style={styles.subtitle}>Ofertas y necesidades con ubicaciones aproximadas. No rastreamos tu ubicación.</Text>
         <View style={styles.legend}>
           <View style={styles.legendItem}><View style={styles.offerDot} /><Text style={styles.legendText}>Material disponible</Text></View>
           <View style={styles.legendItem}><View style={styles.needDot} /><Text style={styles.legendText}>Material que se necesita</Text></View>
@@ -200,7 +200,7 @@ export default function MapScreen() {
           </TouchableOpacity>
         ))}
         <TouchableOpacity accessibilityRole="button" onPress={goBack} style={styles.backLink}>
-          <Text style={styles.linkText}>← Volver a la demo</Text>
+          <Text style={styles.linkText}>← Volver a ReBuild</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
