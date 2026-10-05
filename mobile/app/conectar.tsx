@@ -51,7 +51,7 @@ export default function ConnectScreen() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor={colors.primary} />}
     >
-      <AppHeader title="Conectar" subtitle="Conversaciones nacidas de coincidencias de materiales." />
+      <AppHeader title="Conversaciones" />
       {!token ? (
         <EmptyState title="Inicia sesión para conectar" message="Tus conversaciones aparecerán aquí." action={<PrimaryButton title="Iniciar sesión" onPress={() => router.push('/login')} style={styles.action} />} />
       ) : loading ? (
@@ -59,7 +59,7 @@ export default function ConnectScreen() {
       ) : error ? (
         <EmptyState title="No pudimos cargar tus chats" message={error} action={<PrimaryButton title="Reintentar" onPress={() => void load()} style={styles.action} />} />
       ) : conversations.length === 0 ? (
-        <EmptyState title="Aún no tienes conversaciones" message="Cuando conectes desde una coincidencia, el chat aparecerá aquí." action={<PrimaryButton title="Ver coincidencias" onPress={() => router.push('/matches')} style={styles.action} />} />
+        <EmptyState title="Aún no tienes conversaciones" message="Contacta desde una coincidencia." action={<PrimaryButton title="Ver coincidencias" onPress={() => router.push('/matches')} style={styles.action} />} />
       ) : (
         <View style={styles.list}>
           {conversations.map((conversation) => {

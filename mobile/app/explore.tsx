@@ -43,8 +43,7 @@ export default function ExploreScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadMaterials(true)} tintColor={colors.primary} />}>
-      <Text style={styles.title}>Explorar materiales</Text>
-      <Text style={styles.subtitle}>Encuentra materiales disponibles cerca de ti.</Text>
+      <Text style={styles.title}>Publicaciones</Text>
       <TextInput placeholder="Buscar madera, pintura..." value={search} onChangeText={setSearch} style={styles.input} placeholderTextColor={colors.muted} />
 
       <Text style={styles.filterLabel}>Categoría</Text>

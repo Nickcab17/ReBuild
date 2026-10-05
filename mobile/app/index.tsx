@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View, TextInput, TouchableOpacity, Image } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View, TouchableOpacity, Image } from 'react-native';
 import { Link, useFocusEffect, useRouter } from 'expo-router';
-import { colors, categories } from '../constants/theme';
+import { colors } from '../constants/theme';
 import { Logo } from '../components/Branding';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
@@ -9,10 +9,8 @@ import type { Material } from '../types';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { user, token, loading } = useAuth();
+  const { user, loading } = useAuth();
   const [materials, setMaterials] = useState<Material[]>([]);
-  const [matchCount, setMatchCount] = useState(0);
-  const [query, setQuery] = useState('');
   const [materialsError, setMaterialsError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -25,16 +23,6 @@ export default function HomeScreen() {
     return () => { active = false; };
   });
 
-  useEffect(() => {
-    if (!token) { setMatchCount(0); return; }
-    api.getMatches(token).then((data) => setMatchCount((data as unknown[]).length)).catch(() => setMatchCount(0));
-  }, [token]);
-
-  const visibleMaterials = materials.filter((item) => {
-    const searchText = `${item.name} ${item.description} ${item.category}`.toLowerCase();
-    return searchText.includes(query.toLowerCase());
-  });
-
   if (loading || !user) {
     return <View style={styles.loadingState}><ActivityIndicator color={colors.primary} /><Text style={styles.emptyStateText}>Cargando tu sesión...</Text></View>;
   }
@@ -43,32 +31,18 @@ export default function HomeScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.headerCard}>
         <Logo compact />
-        <Text style={styles.title}>{loading ? 'Cargando...' : user ? `Hola, ${user.name.split(' ')[0]}` : 'Bienvenido a Rebuild'}</Text>
-        <Text style={styles.subtitle}>¿Qué necesitas encontrar?</Text>
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Buscar materiales"
-          style={styles.searchInput}
-        />
+        <Text style={styles.title}>Tú describes. La IA conecta.</Text>
+        <Text style={styles.subtitle}>Publica → Encuentra → Conecta</Text>
       </View>
 
       <View style={styles.sectionRow}>
-        <Text style={styles.sectionTitle}>Materiales cerca de ti</Text>
+        <Text style={styles.sectionTitle}>Publicaciones recientes</Text>
         <Link href="/explore" asChild>
-          <TouchableOpacity>
-            <Text style={styles.linkText}>Explorar</Text>
+          <TouchableOpacity accessibilityRole="button">
+            <Text style={styles.linkText}>Ver todas</Text>
           </TouchableOpacity>
         </Link>
       </View>
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryRow}>
-        {categories.map((category) => (
-          <View key={category} style={styles.pill}>
-            <Text style={styles.pillText}>{category}</Text>
-          </View>
-        ))}
-      </ScrollView>
 
       <View style={styles.quickActions}>
         <Link href={user ? '/publish' : '/login'} asChild>
@@ -84,26 +58,20 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.navigationRow}>
-        <Link href="/matches" asChild><TouchableOpacity><Text style={styles.linkText}>Coincidencias ({matchCount})</Text></TouchableOpacity></Link>
-        <Link href="/requests" asChild><TouchableOpacity><Text style={styles.linkText}>Mis solicitudes</Text></TouchableOpacity></Link>
-        <Link href="/profile" asChild><TouchableOpacity><Text style={styles.linkText}>Perfil</Text></TouchableOpacity></Link>
-        <Link href="/map" asChild><TouchableOpacity><Text style={styles.linkText}>Mapa</Text></TouchableOpacity></Link>
+        <Link href="/map" asChild><TouchableOpacity accessibilityRole="button"><Text style={styles.linkText}>Ver mapa</Text></TouchableOpacity></Link>
       </View>
-
-      <Text style={styles.sectionTitle}>Publicaciones recientes</Text>
 
       {materialsError ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateTitle}>No pudimos cargar los materiales</Text>
           <Text style={styles.emptyStateText}>{materialsError}</Text>
         </View>
-      ) : visibleMaterials.length === 0 ? (
+      ) : materials.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyStateTitle}>Sin materiales todavía</Text>
-          <Text style={styles.emptyStateText}>Aún no hay publicaciones en esta búsqueda.</Text>
+          <Text style={styles.emptyStateTitle}>Aún no hay publicaciones</Text>
         </View>
       ) : (
-        visibleMaterials.slice(0, 3).map((material) => (
+        materials.slice(0, 3).map((material) => (
           <Link key={material.id} href={{ pathname: '/material/[id]', params: { id: material.id } }} asChild>
             <TouchableOpacity style={styles.card}>
               <Image
@@ -129,13 +97,9 @@ const styles = StyleSheet.create({
   eyebrow: { color: colors.primary, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase' },
   title: { fontSize: 28, fontWeight: '800', color: colors.text, marginTop: 8 },
   subtitle: { fontSize: 16, color: colors.muted, marginTop: 6 },
-  searchInput: { marginTop: 16, borderRadius: 12, padding: 12, backgroundColor: '#F0F6F3', color: colors.text },
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
   linkText: { color: colors.primary, fontWeight: '600' },
-  categoryRow: { marginTop: 16, marginBottom: 8 },
-  pill: { backgroundColor: colors.surface, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, marginRight: 8 },
-  pillText: { color: colors.text, fontWeight: '600' },
   quickActions: { flexDirection: 'row', gap: 12, marginTop: 18, marginBottom: 20 },
   primaryButton: { flex: 1, backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
   primaryButtonText: { color: '#FFF', fontWeight: '700' },

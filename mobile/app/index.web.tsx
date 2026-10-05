@@ -271,7 +271,7 @@ export default function WebDemoHome() {
   const publish = () => {
     const quantity = Number(form.quantity.replace(',', '.'));
     if (!form.material.trim() || !category || !form.type.trim() || !Number.isFinite(quantity) || quantity <= 0 || !form.unit.trim() || !form.condition.trim() || !form.location.trim() || !form.description.trim()) {
-      setError('Completa material, descripción, categoría, tipo, cantidad, unidad, condición y ubicación para continuar.');
+      setError('Completa los campos obligatorios antes de publicar.');
       return;
     }
 
@@ -337,16 +337,14 @@ export default function WebDemoHome() {
 
   const tabs = [
     { label: 'Inicio', icon: { ios: 'house.fill', android: 'home', web: 'home' }, target: 'home' },
-    { label: 'Explorar', icon: { ios: 'magnifyingglass', android: 'search', web: 'search' }, target: 'explore' },
     { label: 'Publicar', icon: { ios: 'plus', android: 'add', web: 'add' }, target: 'publish' },
-    { label: 'Mapa', icon: { ios: 'map.fill', android: 'map', web: 'map' }, target: 'map' },
-    { label: 'Conectar', icon: { ios: 'bubble.left.and.bubble.right', android: 'forum', web: 'forum' }, target: 'connect' },
+    { label: 'Publicaciones', icon: { ios: 'magnifyingglass', android: 'search', web: 'search' }, target: 'explore' },
+    { label: 'Coincidencias', icon: { ios: 'sparkles', android: 'auto_awesome', web: 'auto_awesome' }, target: 'matches' },
     { label: 'Perfil', icon: { ios: 'person.crop.circle', android: 'person', web: 'person' }, target: 'profile' },
   ] as const;
 
-  const selectTab = (target: Stage | 'map') => {
-    if (target === 'map') router.push('/map');
-    else if (target === 'publish') startPublish('need');
+  const selectTab = (target: Stage) => {
+    if (target === 'publish') startPublish('need');
     else setStage(target);
   };
 
@@ -361,28 +359,16 @@ export default function WebDemoHome() {
       <View style={styles.homeHeaderCard}>
         <BrandLogo compact />
         <Text style={styles.homeTitle}>Tú describes. La IA conecta.</Text>
-        <Text style={styles.homeSubtitle}>ReBuild conecta materiales reutilizables con quienes los necesitan.</Text>
-        <Text style={styles.homeHint}>PUBLICA → ENCUENTRA → CONECTA</Text>
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Buscar materiales"
-          placeholderTextColor={colors.muted}
-          style={styles.searchInput}
-        />
+        <Text style={styles.homeSubtitle}>Materiales reutilizables para tus proyectos.</Text>
+        <Text style={styles.homeHint}>Publica → Encuentra → Conecta</Text>
       </View>
 
       <View style={styles.sectionRow}>
-        <Text style={styles.sectionTitle}>Materiales cerca de ti</Text>
+        <Text style={styles.sectionTitle}>Publicaciones recientes</Text>
         <TouchableOpacity accessibilityRole="button" onPress={() => setStage('explore')}>
-          <Text style={styles.linkText}>Explorar</Text>
+          <Text style={styles.linkText}>Ver todas</Text>
         </TouchableOpacity>
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryRow}>
-        {['Todos', ...categories].map((item) => (
-          <CategoryChip key={item} label={item} active={selectedCategory === item} onPress={() => setSelectedCategory(item)} />
-        ))}
-      </ScrollView>
 
       <View style={[styles.quickActions, desktop && styles.quickActionsDesktop]}>
         <PrimaryButton title="Tengo un material" onPress={() => startPublish('offer')} style={styles.quickPrimary} />
@@ -396,20 +382,9 @@ export default function WebDemoHome() {
       </View>
 
       <View style={styles.navigationRow}>
-        <TouchableOpacity accessibilityRole="button" onPress={() => setStage('matches')}><Text style={styles.linkText}>Coincidencias</Text></TouchableOpacity>
-        <TouchableOpacity accessibilityRole="button" onPress={() => setStage('connect')}><Text style={styles.linkText}>Conectar</Text></TouchableOpacity>
-        <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/map')}><Text style={styles.linkText}>Mapa</Text></TouchableOpacity>
-        {currentUser ? (
-          <TouchableOpacity accessibilityRole="button" onPress={() => setStage('profile')}><Text style={styles.linkText}>Perfil</Text></TouchableOpacity>
-        ) : (
-          <>
-            <TouchableOpacity accessibilityRole="button" onPress={() => openAuth('register')}><Text style={styles.linkText}>Crear cuenta</Text></TouchableOpacity>
-            <TouchableOpacity accessibilityRole="button" onPress={() => openAuth('login')}><Text style={styles.linkText}>Iniciar sesión</Text></TouchableOpacity>
-          </>
-        )}
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/map')}><Text style={styles.linkText}>Ver mapa</Text></TouchableOpacity>
       </View>
 
-      <Text style={[styles.sectionTitle, styles.recentTitle]}>Publicaciones recientes</Text>
       {visibleOffers.length === 0 ? (
         <EmptyState title="No encontramos materiales" message="Prueba cambiando la búsqueda o la categoría." />
       ) : visibleOffers.slice(0, 3).map((offer) => (
@@ -426,12 +401,6 @@ export default function WebDemoHome() {
           </View>
         </TouchableOpacity>
       ))}
-
-      <View style={styles.aiCard}>
-        <Text style={styles.sectionTitle}>¿Cómo conecta la IA?</Text>
-        <Text style={styles.aiDescription}>Compara material, tipo, cantidad, condición y ubicación para priorizar coincidencias.</Text>
-        <Text style={styles.aiNote}>La foto complementa la publicación; no identifica materiales.</Text>
-      </View>
     </>
   );
 
@@ -439,7 +408,6 @@ export default function WebDemoHome() {
     <>
       {topHeader}
       <Text style={styles.screenTitle}>Publicar material</Text>
-      <Text style={styles.screenSubtitle}>Describe el material y su estado.</Text>
       <View style={styles.intentRow}>
         <CategoryChip label="Tengo un material" active={intent === 'offer'} onPress={() => setIntent('offer')} />
         <CategoryChip label="Necesito un material" active={intent === 'need'} onPress={() => setIntent('need')} />
@@ -462,10 +430,10 @@ export default function WebDemoHome() {
       <TouchableOpacity accessibilityRole="button" onPress={selectPhoto} style={styles.photoPicker}>
         <Text style={styles.photoPickerIcon}>＋</Text>
         <Text style={styles.photoPickerTitle}>Agregar foto</Text>
-        <Text style={styles.photoPickerText}>Elige una imagen desde tu computadora</Text>
+        <Text style={styles.photoPickerText}>Elige una imagen</Text>
       </TouchableOpacity>
       )}
-      <Text style={styles.photoNote}>La foto complementa la publicación; las coincidencias se basan en el texto.</Text>
+      <Text style={styles.photoNote}>La IA compara el texto, no la foto.</Text>
       {photoError ? <Text accessibilityRole="alert" style={styles.error}>{photoError}</Text> : null}
 
       <Text style={styles.label}>Material *</Text>
@@ -476,7 +444,7 @@ export default function WebDemoHome() {
         multiline
         value={form.description}
         onChangeText={(value) => update('description', value)}
-        placeholder="Describe el material y su estado"
+        placeholder="Ej. Sobrante limpio y reutilizable"
         style={[styles.input, styles.textArea]}
         placeholderTextColor={colors.muted}
       />
@@ -521,8 +489,7 @@ export default function WebDemoHome() {
   const exploreScreen = () => (
     <>
       {topHeader}
-      <Text style={styles.screenTitle}>Explorar materiales</Text>
-      <Text style={styles.screenSubtitle}>Encuentra materiales disponibles cerca de ti.</Text>
+      <Text style={styles.screenTitle}>Publicaciones</Text>
       <TextInput
         value={search}
         onChangeText={setSearch}
@@ -557,15 +524,17 @@ export default function WebDemoHome() {
     <>
       {topHeader}
       <Text style={styles.screenTitle}>Coincidencias</Text>
-      <Text style={styles.screenSubtitle}>Coincidencias priorizadas por compatibilidad.</Text>
+      <TouchableOpacity accessibilityRole="button" onPress={() => setStage('connect')} style={styles.conversationsLink}>
+        <Text style={styles.linkText}>Ver conversaciones</Text>
+      </TouchableOpacity>
       {publicationNotice ? <Text accessibilityRole="alert" style={styles.matchNotice}>{publicationNotice}</Text> : null}
       <View style={styles.matchList}>
         {matches.length ? matches.map((match) => (
           <View key={match.publication.id} style={styles.matchCard}>
-            <Text style={styles.matchBadge}>✨ Encontramos una coincidencia</Text>
+            <Text style={styles.matchBadge}>Coincidencia</Text>
             {publicationPhoto(match.publication) ? <Image source={publicationPhoto(match.publication)!} resizeMode="cover" style={styles.matchPhoto} /> : null}
             <Text style={styles.matchName}>{match.publication.material}</Text>
-            <Text style={styles.matchMeta}>{intent === 'offer' ? 'Oferta publicada' : 'Necesidad detectada'}: {form.material}</Text>
+            <Text style={styles.matchMeta}>{intent === 'offer' ? 'Ofreces' : 'Buscas'}: {form.material}</Text>
             <Text style={styles.matchMeta}>Tipo: {match.publication.type}</Text>
             <Text style={styles.matchMeta}>{match.publication.quantity} {match.publication.unit} · {match.publication.location}</Text>
             <Text style={styles.matchMeta}>Condición: {match.publication.condition}</Text>
@@ -575,7 +544,7 @@ export default function WebDemoHome() {
             <PrimaryButton title="Ver detalle" onPress={() => openDetail(match)} style={styles.matchButton} />
           </View>
         )) : (
-          <EmptyState title="Todavía no hay coincidencias" message="Describe lo que tienes o necesitas para encontrar coincidencias." action={<PrimaryButton title="Publicar una descripción" onPress={() => setStage('publish')} style={styles.matchButton} />} />
+          <EmptyState title="Aún no hay coincidencias" message="Publica lo que tienes o necesitas." action={<PrimaryButton title="Publicar" onPress={() => setStage('publish')} style={styles.matchButton} />} />
         )}
       </View>
     </>
@@ -646,11 +615,11 @@ export default function WebDemoHome() {
 
   const connectScreen = () => (
     <>
-      <AppHeader title="Conectar" subtitle="Conversaciones sobre materiales." />
+      <AppHeader title="Conversaciones" />
       {activeChats.length === 0 ? (
         <EmptyState
           title="Aún no tienes conversaciones"
-          message="Contacta desde una coincidencia para iniciar un chat."
+          message="Contacta desde una coincidencia."
           action={<PrimaryButton title="Ver coincidencias" onPress={() => setStage('matches')} style={styles.matchButton} />}
         />
       ) : activeChats.map((chat) => (
@@ -828,6 +797,7 @@ const styles = StyleSheet.create({
   quickSecondary: { flex: 1, backgroundColor: colors.accent, paddingVertical: 14, paddingHorizontal: 10, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   quickSecondaryText: { color: colors.text, fontFamily: 'Sora_700Bold', fontSize: 14, textAlign: 'center' },
   navigationRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 20 },
+  conversationsLink: { alignSelf: 'flex-start', marginTop: 4 },
   recentTitle: { marginBottom: 12 },
   materialCard: { backgroundColor: colors.surface, borderRadius: 22, overflow: 'hidden', marginBottom: 16, ...shadows.card },
   materialImage: { width: '100%', height: 172 },

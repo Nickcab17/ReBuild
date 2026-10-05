@@ -42,7 +42,7 @@ export default function RequestScreen() {
   return <ScrollView style={styles.container} contentContainerStyle={styles.content}>
     <BrandLogo compact />
     <Text style={styles.title}>Necesito material</Text>
-    <Text style={styles.subtitle}>Describe lo que buscas y revisaremos posibles coincidencias.</Text>
+    <Text style={styles.subtitle}>Describe lo que buscas.</Text>
     <Text style={styles.label}>Material *</Text><TextInput value={form.material} onChangeText={(value) => update('material', value)} placeholder="Ej. Madera para mesa" style={styles.input} placeholderTextColor={colors.muted} />
     <Text style={styles.label}>Categoría *</Text><View style={styles.chipRow}>{categories.map((category) => <CategoryChip key={category} label={category} active={form.category === category} onPress={() => update('category', category)} />)}</View>
     <Text style={styles.label}>Cantidad * y unidad *</Text><View style={styles.quantityRow}><TextInput keyboardType="numeric" value={form.quantity} onChangeText={(value) => update('quantity', value)} placeholder="10" style={[styles.input, styles.quantityInput]} placeholderTextColor={colors.muted} /><View style={styles.unitRow}>{units.map((unit) => <CategoryChip key={unit} label={unit} active={form.unit === unit} onPress={() => update('unit', unit)} />)}</View></View>
