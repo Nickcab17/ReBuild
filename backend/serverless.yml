@@ -19,7 +19,7 @@ provider:
           Resource: arn:aws:dynamodb:${self:provider.region}:*:table/Rebuild*
   environment:
     NODE_ENV: production
-    JWT_SECRET: ${env:JWT_SECRET, 'dev-secret'}
+    JWT_SECRET: ${env:JWT_SECRET}
     DYNAMODB_ENABLED: 'true'
     DYNAMODB_TABLE_PREFIX: Rebuild
 

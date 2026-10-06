@@ -4,7 +4,7 @@ dotenv.config();
 
 export const config = {
   port: Number(process.env.PORT ?? 3001),
-  jwtSecret: process.env.JWT_SECRET ?? 'dev-secret',
+  jwtSecret: process.env.JWT_SECRET ?? (process.env.NODE_ENV === 'production' ? '' : 'dev-secret'),
   apiBaseUrl: process.env.API_BASE_URL ?? 'http://localhost:3001',
   isLocal: process.env.NODE_ENV !== 'production',
   dynamoEnabled: process.env.DYNAMODB_ENABLED === 'true',

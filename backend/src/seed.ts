@@ -138,7 +138,7 @@ export async function createDemoData() {
     },
   ];
 
-  const createdMaterials = demoOfferings.map((material) => createMaterial(material));
+  const createdMaterials = await Promise.all(demoOfferings.map((material) => createMaterial(material)));
 
   const demoRequests: Array<Omit<MaterialRequest, 'id' | 'createdAt' | 'updatedAt'> & { userId: string }> = [
     {
@@ -213,7 +213,7 @@ export async function createDemoData() {
     },
   ];
 
-  const createdRequests = demoRequests.map((request) => createRequest(request));
+  const createdRequests = await Promise.all(demoRequests.map((request) => createRequest(request)));
 
   const matchesToCreate = [
     { materialIndex: 0, requestIndex: 0 },
@@ -226,7 +226,7 @@ export async function createDemoData() {
   for (const pair of matchesToCreate) {
     const material = createdMaterials[pair.materialIndex];
     const request = createdRequests[pair.requestIndex];
-    findMatchesForRequest(request.id);
+    await findMatchesForRequest(request.id);
     store.matches.set(`${material.id}-${request.id}`, {
       id: `${material.id}-${request.id}`,
       materialId: material.id,

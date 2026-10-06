@@ -30,6 +30,7 @@ export interface Material {
   id: string;
   userId: string;
   name: string;
+  type?: string;
   description: string;
   category: MaterialCategory;
   quantity: number;
@@ -50,9 +51,11 @@ export interface MaterialRequest {
   id: string;
   userId: string;
   material: string;
+  type?: string;
   category: MaterialCategory;
   quantity: number;
   unit: string;
+  condition?: string;
   description: string;
   location: string;
   neededBy: string;

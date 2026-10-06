@@ -49,7 +49,7 @@ export function searchMaterials(query: string) {
   });
 }
 
-export function createMaterial(input: Omit<Material, 'id' | 'createdAt' | 'updatedAt'> & { userId: string }) {
+export async function createMaterial(input: Omit<Material, 'id' | 'createdAt' | 'updatedAt'> & { userId: string }) {
   const material: Material = {
     ...input,
     id: createId('mat'),
@@ -59,29 +59,29 @@ export function createMaterial(input: Omit<Material, 'id' | 'createdAt' | 'updat
     aiTags: classifyMaterial(`${input.name} ${input.description}`).keywords,
   };
 
+  await persistItem('materials', material as unknown as Record<string, unknown>);
   getStore().materials.set(material.id, material);
-  persistItem('materials', material as unknown as Record<string, unknown>);
   return material;
 }
 
-export function updateMaterial(materialId: string, updates: Partial<Material>, userId: string) {
+export async function updateMaterial(materialId: string, updates: Partial<Material>, userId: string) {
   const material = getStore().materials.get(materialId);
   if (!material) throw new Error('Material no encontrado.');
   if (material.userId !== userId) throw new Error('No tienes permiso para modificar este material.');
 
   const next = { ...material, ...updates, updatedAt: new Date().toISOString() };
+  await persistItem('materials', next as unknown as Record<string, unknown>);
   getStore().materials.set(materialId, next);
-  persistItem('materials', next as unknown as Record<string, unknown>);
   return next;
 }
 
-export function deleteMaterial(materialId: string, userId: string) {
+export async function deleteMaterial(materialId: string, userId: string) {
   const store = getStore();
   const material = store.materials.get(materialId);
   if (!material) throw new Error('Material no encontrado.');
   if (material.userId !== userId) throw new Error('No tienes permiso para eliminar este material.');
+  await removeItem('materials', materialId);
   store.materials.delete(materialId);
-  removeItem('materials', materialId);
   return material;
 }
 
@@ -89,7 +89,7 @@ export function listRequests() {
   return Array.from(getStore().requests.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export function createRequest(input: Omit<MaterialRequest, 'id' | 'createdAt' | 'updatedAt'> & { userId: string }) {
+export async function createRequest(input: Omit<MaterialRequest, 'id' | 'createdAt' | 'updatedAt'> & { userId: string }) {
   const request: MaterialRequest = {
     ...input,
     id: createId('req'),
@@ -97,12 +97,12 @@ export function createRequest(input: Omit<MaterialRequest, 'id' | 'createdAt' | 
     updatedAt: new Date().toISOString(),
   };
 
+  await persistItem('requests', request as unknown as Record<string, unknown>);
   getStore().requests.set(request.id, request);
-  persistItem('requests', request as unknown as Record<string, unknown>);
   return request;
 }
 
-export function findMatchesForRequest(requestId: string) {
+export async function findMatchesForRequest(requestId: string) {
   const request = getStore().requests.get(requestId);
   if (!request) throw new Error('Solicitud no encontrada.');
 
@@ -123,8 +123,8 @@ export function findMatchesForRequest(requestId: string) {
       createdAt: new Date().toISOString(),
     };
     matches.push(match);
+    await persistItem('matches', match as unknown as Record<string, unknown>);
     getStore().matches.set(match.id, match);
-    persistItem('matches', match as unknown as Record<string, unknown>);
   }
   return matches;
 }
@@ -137,7 +137,7 @@ export function listFavorites(userId: string) {
   return Array.from(getStore().favorites.values()).filter((favorite) => favorite.userId === userId);
 }
 
-export function addFavorite(userId: string, materialId: string) {
+export async function addFavorite(userId: string, materialId: string) {
   const store = getStore();
   if (!store.materials.has(materialId)) throw new Error('Material no encontrado.');
   const existing = Array.from(store.favorites.values()).find((favorite) => favorite.userId === userId && favorite.materialId === materialId);
@@ -150,20 +150,20 @@ export function addFavorite(userId: string, materialId: string) {
     createdAt: new Date().toISOString(),
   };
 
+  await persistItem('favorites', favorite as unknown as Record<string, unknown>);
   store.favorites.set(favorite.id, favorite);
-  persistItem('favorites', favorite as unknown as Record<string, unknown>);
   return favorite;
 }
 
-export function removeFavorite(userId: string, materialId: string) {
+export async function removeFavorite(userId: string, materialId: string) {
   const favorite = Array.from(getStore().favorites.values()).find((entry) => entry.userId === userId && entry.materialId === materialId);
   if (!favorite) return null;
+  await removeItem('favorites', favorite.id);
   getStore().favorites.delete(favorite.id);
-  removeItem('favorites', favorite.id);
   return favorite;
 }
 
-export function findMatchesForMaterial(materialId: string) {
+export async function findMatchesForMaterial(materialId: string) {
   const material = getMaterial(materialId);
   const requests = listRequests();
   const matches: Match[] = [];
@@ -182,8 +182,8 @@ export function findMatchesForMaterial(materialId: string) {
       createdAt: new Date().toISOString(),
     };
     matches.push(match);
+    await persistItem('matches', match as unknown as Record<string, unknown>);
     getStore().matches.set(match.id, match);
-    persistItem('matches', match as unknown as Record<string, unknown>);
   }
 
   return matches;

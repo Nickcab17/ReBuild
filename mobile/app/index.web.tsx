@@ -7,10 +7,13 @@ import { AppHeader, BrandLogo, PrimaryButton } from '../components/Branding';
 import { CategoryChip, EmptyState, materialPlaceholder } from '../components/RebuildUI';
 import { colors, categories, radius, shadows, typography } from '../constants/theme';
 import { findDemoMatches, readSavedDemoPublications, webDemoPublications, WEB_DEMO_PUBLICATIONS_STORAGE_KEY, coordinatesForLocation, type DemoMatch, type DemoPublication, type PublicationIntent } from '../data/webDemo';
-import { clearDemoSession, readDemoAccounts, readDemoSession, saveDemoSession, WEB_DEMO_ACCOUNTS_STORAGE_KEY, type DemoAccount } from '../data/webAuth';
+import { clearLegacyDemoStorage, clearWebAuthToken, readWebAuthSession, saveWebAuthToken } from '../data/webAuth';
+import { isApiConfigured, type ApiUser, api } from '../services/api';
+import { loadPersistedWebData } from '../services/webPersistence';
 
 type Stage = 'home' | 'publish' | 'explore' | 'matches' | 'detail' | 'connect' | 'login' | 'register' | 'profile';
 type PublicationForm = Omit<DemoPublication, 'id' | 'owner' | 'intent' | 'quantity'> & { quantity: string };
+type DemoAccount = Pick<ApiUser, 'id' | 'name' | 'email' | 'city' | 'role' | 'createdAt'> & { password: string };
 
 const emptyForm: PublicationForm = {
   material: '',
@@ -26,6 +29,7 @@ const conditions = ['Excelente', 'Buena', 'Usada', 'Necesita reparación'];
 const units = ['m²', 'pieza', 'unidad', 'tablas', 'botes', 'metros', 'kilogramos', 'sets'];
 const locations = ['Ciudad de México', 'Roma Norte, CDMX', 'Coyoacán, CDMX', 'Guadalajara', 'Monterrey'];
 const demoOffers = webDemoPublications.filter((publication) => publication.intent === 'offer');
+const useLocalDemo = !isApiConfigured && process.env.NODE_ENV !== 'production';
 const publicationPhotos: Record<string, ImageSourcePropType> = {
   'mat-01': require('../assets/materials/wood.jpg'),
   'mat-02': require('../assets/materials/bricks.jpg'),
@@ -65,6 +69,7 @@ function compressPhoto(source: string) {
 }
 
 function displayCategory(publication: DemoPublication) {
+  if (publication.category && categories.includes(publication.category as typeof categories[number])) return publication.category;
   if (publication.type === 'Cerámico' || publication.type === 'Ladrillo') return 'Construcción';
   if (publication.type === 'Tubería') return 'Plástico';
   return categories.includes(publication.type as typeof categories[number]) ? publication.type : 'Otros';
@@ -99,13 +104,19 @@ export default function WebDemoHome() {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [error, setError] = useState('');
-  const [currentUser, setCurrentUser] = useState<DemoAccount | null>(null);
+  const [currentUser, setCurrentUser] = useState<DemoAccount | ApiUser | null>(null);
+  const [demoAccounts, setDemoAccounts] = useState<DemoAccount[]>([]);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [persistedMatches, setPersistedMatches] = useState<Array<{ source: DemoPublication; match: DemoMatch }>>([]);
   const [authName, setAuthName] = useState('');
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState('');
 
-  const visibleOffers = useMemo(() => [...localPublications.filter((publication) => publication.intent === 'offer').reverse(), ...demoOffers].filter((offer) => {
+  const visibleOffers = useMemo(() => [
+    ...localPublications.filter((publication) => publication.intent === 'offer').reverse(),
+    ...(useLocalDemo ? demoOffers : []),
+  ].filter((offer) => {
     const matchesSearch = `${offer.material} ${offer.type} ${offer.description} ${offer.location}`
       .toLowerCase()
       .includes(search.trim().toLowerCase());
@@ -117,25 +128,60 @@ export default function WebDemoHome() {
   );
   const myMatches = useMemo(() => {
     if (!currentUser) return [];
+    if (!useLocalDemo) return persistedMatches;
     const candidates = [...webDemoPublications, ...localPublications];
     return myPublications.flatMap((source) =>
       findDemoMatches(source, candidates).map((match) => ({ source, match })),
     );
-  }, [currentUser, localPublications, myPublications]);
+  }, [currentUser, localPublications, myPublications, persistedMatches]);
 
   useEffect(() => {
+    try {
+      clearLegacyDemoStorage(!useLocalDemo);
+    } catch {
+      setAuthError('No se pudieron limpiar las credenciales locales anteriores.');
+    }
+    if (!useLocalDemo) {
+      const restoreApiSession = async () => {
+        let token: string | null = null;
+        let user: ApiUser | null = null;
+        let sessionError = '';
+        try {
+          const savedSession = readWebAuthSession();
+          if (savedSession) {
+            const session = await api.refreshSession(savedSession.refreshToken);
+            token = session.token;
+            user = session.user;
+            saveWebAuthToken(session.token, session.refreshToken);
+            setAuthToken(session.token);
+            setCurrentUser(session.user);
+          }
+        } catch (restoreError) {
+          clearWebAuthToken();
+          token = null;
+          setAuthToken(null);
+          setCurrentUser(null);
+          sessionError = restoreError instanceof Error ? restoreError.message : 'No se pudo recuperar la sesión.';
+        }
+
+        try {
+          const data = await loadPersistedWebData(token, user);
+          setLocalPublications(data.publications);
+          setPersistedMatches(data.myMatches);
+          setMatches(data.myMatches.map(({ match }) => match));
+          setPublicationNotice(sessionError);
+        } catch (loadError) {
+          setPublicationNotice(loadError instanceof Error ? loadError.message : 'No se pudieron cargar los datos del servidor.');
+        }
+      };
+      void restoreApiSession();
+      return;
+    }
+
     try {
       setLocalPublications(readSavedDemoPublications());
     } catch {
       setPublicationNotice('No se pudieron leer las publicaciones guardadas en este navegador.');
-    }
-    try {
-      const savedSession = readDemoSession();
-      const account = savedSession ? readDemoAccounts().find((saved) => saved.id === savedSession) : undefined;
-      if (account) setCurrentUser(account);
-      else if (savedSession) clearDemoSession();
-    } catch {
-      setAuthError('No se pudo recuperar la sesión guardada.');
     }
   }, []);
 
@@ -161,63 +207,102 @@ export default function WebDemoHome() {
     setStage(nextStage);
   };
 
-  const register = () => {
+  const register = async () => {
     const name = authName.trim();
     const email = authEmail.trim();
-    const normalizedEmail = email.toLowerCase();
     if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !authPassword) {
       setAuthError('Completa nombre, correo válido y contraseña.');
       return;
     }
 
-    try {
-      const accounts = readDemoAccounts();
-      if (accounts.some((account) => account.email.toLowerCase() === normalizedEmail)) {
+    if (useLocalDemo) {
+      if (demoAccounts.some((account) => account.email.toLowerCase() === email.toLowerCase())) {
         setAuthError('Ya existe una cuenta con ese correo.');
         return;
       }
       const account: DemoAccount = {
-        id: `user-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        id: `demo-user-${Date.now()}`,
         name,
         email,
+        city: 'Ciudad de México',
+        role: 'user',
+        createdAt: new Date().toISOString(),
         password: authPassword,
       };
-      window.localStorage.setItem(WEB_DEMO_ACCOUNTS_STORAGE_KEY, JSON.stringify([...accounts, account]));
-      saveDemoSession(account.id);
+      setDemoAccounts((accounts) => [...accounts, account]);
       setCurrentUser(account);
       setAuthError('');
       setStage('profile');
-    } catch {
-      setAuthError('No se pudo guardar la cuenta en este navegador.');
+      return;
+    }
+
+    try {
+      const session = await api.register({ name, email, password: authPassword });
+      saveWebAuthToken(session.token, session.refreshToken);
+      setAuthToken(session.token);
+      setCurrentUser(session.user);
+      setAuthError('');
+      setStage('profile');
+      try {
+        const data = await loadPersistedWebData(session.token, session.user);
+        setLocalPublications(data.publications);
+        setPersistedMatches(data.myMatches);
+        setMatches(data.myMatches.map(({ match }) => match));
+        setPublicationNotice('');
+      } catch (loadError) {
+        setPublicationNotice(loadError instanceof Error ? loadError.message : 'No se pudieron cargar tus datos.');
+      }
+    } catch (registerError) {
+      setAuthError(registerError instanceof Error ? registerError.message : 'No se pudo crear la cuenta.');
     }
   };
 
-  const login = () => {
+  const login = async () => {
     if (!authEmail.trim() || !authPassword) {
       setAuthError('Escribe tu correo y contraseña.');
       return;
     }
-    try {
-      const account = readDemoAccounts().find((saved) =>
+    if (useLocalDemo) {
+      const account = demoAccounts.find((saved) =>
         saved.email.toLowerCase() === authEmail.trim().toLowerCase() && saved.password === authPassword,
       );
       if (!account) {
         setAuthError('Correo o contraseña incorrectos.');
         return;
       }
-      saveDemoSession(account.id);
       setCurrentUser(account);
       setAuthError('');
       setStage('profile');
-    } catch {
-      setAuthError('No se pudo iniciar sesión en este navegador.');
+      return;
+    }
+
+    try {
+      const session = await api.login({ email: authEmail.trim(), password: authPassword });
+      saveWebAuthToken(session.token, session.refreshToken);
+      setAuthToken(session.token);
+      setCurrentUser(session.user);
+      setAuthError('');
+      setStage('profile');
+      try {
+        const data = await loadPersistedWebData(session.token, session.user);
+        setLocalPublications(data.publications);
+        setPersistedMatches(data.myMatches);
+        setMatches(data.myMatches.map(({ match }) => match));
+        setPublicationNotice('');
+      } catch (loadError) {
+        setPublicationNotice(loadError instanceof Error ? loadError.message : 'No se pudieron cargar tus datos.');
+      }
+    } catch (loginError) {
+      setAuthError(loginError instanceof Error ? loginError.message : 'No se pudo iniciar sesión.');
     }
   };
 
   const logout = () => {
     try {
-      clearDemoSession();
+      if (!useLocalDemo) clearWebAuthToken();
+      setAuthToken(null);
       setCurrentUser(null);
+      setPersistedMatches([]);
       setStage('home');
     } catch {
       setAuthError('No se pudo cerrar la sesión.');
@@ -268,38 +353,88 @@ export default function WebDemoHome() {
     }
   };
 
-  const publish = () => {
+  const publish = async () => {
     const quantity = Number(form.quantity.replace(',', '.'));
     if (!form.material.trim() || !category || !form.type.trim() || !Number.isFinite(quantity) || quantity <= 0 || !form.unit.trim() || !form.condition.trim() || !form.location.trim() || !form.description.trim()) {
       setError('Completa los campos obligatorios antes de publicar.');
       return;
     }
 
-    const publicationId = `web-${Date.now()}`;
-    const publication: DemoPublication = {
-      ...form,
-      quantity,
-      material: form.material.trim(),
-      type: form.type.trim(),
-      unit: form.unit.trim(),
-      location: form.location.trim(),
-      description: form.description.trim(),
-      id: publicationId,
-      intent,
-      owner: currentUser?.name ?? 'Tú',
-      ownerId: currentUser?.id ?? 'guest',
-      ...coordinatesForLocation(form.location.trim(), publicationId),
-    };
-    const nextPublications = [...localPublications.filter((saved) => saved.id !== publication.id), publication];
-    setLocalPublications(nextPublications);
-    try {
-      window.localStorage.setItem(WEB_DEMO_PUBLICATIONS_STORAGE_KEY, JSON.stringify(nextPublications));
-      setPublicationNotice('');
-    } catch {
-      setPublicationNotice('La publicación está disponible durante esta sesión, pero el navegador no pudo guardarla para la próxima visita.');
+    if (useLocalDemo) {
+      const publicationId = `web-${Date.now()}`;
+      const publication: DemoPublication = {
+        ...form,
+        quantity,
+        material: form.material.trim(),
+        type: form.type.trim(),
+        unit: form.unit.trim(),
+        location: form.location.trim(),
+        description: form.description.trim(),
+        id: publicationId,
+        intent,
+        owner: currentUser?.name ?? 'Tú',
+        ownerId: currentUser?.id ?? 'guest',
+        ...coordinatesForLocation(form.location.trim(), publicationId),
+      };
+      const nextPublications = [...localPublications.filter((saved) => saved.id !== publication.id), publication];
+      setLocalPublications(nextPublications);
+      try {
+        window.localStorage.setItem(WEB_DEMO_PUBLICATIONS_STORAGE_KEY, JSON.stringify(nextPublications));
+        setPublicationNotice('');
+      } catch {
+        setPublicationNotice('La publicación está disponible durante esta sesión, pero el navegador no pudo guardarla para la próxima visita.');
+      }
+      setMatches(findDemoMatches(publication, [...webDemoPublications, ...localPublications]));
+      setStage('matches');
+      return;
     }
-    setMatches(findDemoMatches(publication, [...webDemoPublications, ...localPublications]));
-    setStage('matches');
+
+    if (!currentUser || !authToken) {
+      setError('Inicia sesión para guardar tu publicación.');
+      return;
+    }
+
+    try {
+      const common = {
+        category,
+        type: form.type.trim(),
+        quantity,
+        unit: form.unit.trim(),
+        condition: form.condition.trim(),
+        location: form.location.trim(),
+        description: form.description.trim(),
+      };
+      const created = intent === 'offer'
+        ? await api.createMaterial({
+          ...common,
+          name: form.material.trim(),
+          availability: 'Disponible',
+          photos: [],
+        }, authToken)
+        : await api.createRequest({
+          ...common,
+          material: form.material.trim(),
+          neededBy: new Date().toISOString(),
+        }, authToken);
+
+      if (!created || typeof created !== 'object' || !('id' in created) || typeof created.id !== 'string') {
+        throw new Error('La API no devolvió el identificador de la publicación guardada.');
+      }
+      if (!('role' in currentUser)) throw new Error('Inicia sesión de nuevo para publicar.');
+      const data = await loadPersistedWebData(authToken, currentUser);
+      const savedPublication = data.publications.find((publication) => publication.id === created.id);
+      if (!savedPublication) throw new Error('El servidor guardó la publicación, pero no pudo devolverla al cargar tus datos.');
+      const publication = { ...savedPublication, photoUri: form.photoUri };
+      setLocalPublications(data.publications.map((item) => item.id === publication.id ? publication : item));
+      setPersistedMatches(data.myMatches);
+      setMatches(data.myMatches
+        .filter(({ source }) => source.id === publication.id)
+        .map(({ match }) => match));
+      setPublicationNotice('');
+      setStage('matches');
+    } catch (publishError) {
+      setError(publishError instanceof Error ? publishError.message : 'No se pudo guardar la publicación en el servidor.');
+    }
   };
 
   const openListing = (offer: DemoPublication) => {
@@ -362,6 +497,7 @@ export default function WebDemoHome() {
         <Text style={styles.homeSubtitle}>Materiales reutilizables para tus proyectos.</Text>
         <Text style={styles.homeHint}>Publica → Encuentra → Conecta</Text>
       </View>
+      {publicationNotice ? <Text accessibilityRole="alert" style={styles.matchNotice}>{publicationNotice}</Text> : null}
 
       <View style={styles.sectionRow}>
         <Text style={styles.sectionTitle}>Publicaciones recientes</Text>
@@ -490,6 +626,7 @@ export default function WebDemoHome() {
     <>
       {topHeader}
       <Text style={styles.screenTitle}>Publicaciones</Text>
+      {publicationNotice ? <Text accessibilityRole="alert" style={styles.matchNotice}>{publicationNotice}</Text> : null}
       <TextInput
         value={search}
         onChangeText={setSearch}
@@ -540,7 +677,7 @@ export default function WebDemoHome() {
             <Text style={styles.matchMeta}>Condición: {match.publication.condition}</Text>
             <Text style={styles.matchReason}>{match.score}% · {match.level}</Text>
             <Text style={styles.matchMeta}>{matchCriteria(match)}</Text>
-            <Text style={styles.matchReason}>{demoReason(match)}</Text>
+            <Text style={styles.matchReason}>{useLocalDemo ? demoReason(match) : match.reason}</Text>
             <PrimaryButton title="Ver detalle" onPress={() => openDetail(match)} style={styles.matchButton} />
           </View>
         )) : (
@@ -677,6 +814,7 @@ export default function WebDemoHome() {
       <>
         {topHeader}
         <Text style={styles.screenTitle}>Perfil</Text>
+        {publicationNotice ? <Text accessibilityRole="alert" style={styles.matchNotice}>{publicationNotice}</Text> : null}
         <View style={styles.detailCard}>
           <Text style={styles.detailTitle}>{currentUser.name}</Text>
           <Text style={styles.detailValue}>{currentUser.email}</Text>

@@ -6,6 +6,7 @@ export interface DemoPublication {
   id: string;
   intent: PublicationIntent;
   material: string;
+  category?: string;
   type: string;
   quantity: number;
   unit: string;

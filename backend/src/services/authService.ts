@@ -14,7 +14,7 @@ export async function registerUser(input: {
   const store = getStore();
   const email = normalizeEmail(input.email);
 
-  if (!input.name || !email || !input.password || !input.city) {
+  if (!input.name || !email || !input.password) {
     throw new Error('Faltan datos obligatorios.');
   }
 
@@ -28,14 +28,14 @@ export async function registerUser(input: {
     name: input.name,
     email,
     passwordHash,
-    city: input.city,
+    city: input.city.trim(),
     role: 'user',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
+  await persistItem('users', user as unknown as Record<string, unknown>);
   store.users.set(user.id, user);
-  persistItem('users', user as unknown as Record<string, unknown>);
 
   const token = jwt.sign({ userId: user.id, email: user.email }, config.jwtSecret, { expiresIn: '7d' });
 

@@ -5,7 +5,9 @@ import { getStore } from './store.js';
 
 type TableName = 'users' | 'materials' | 'requests' | 'favorites' | 'matches' | 'conversations' | 'messages';
 
-const client = config.dynamoEnabled ? DynamoDBDocumentClient.from(new DynamoDBClient({})) : null;
+const client = config.dynamoEnabled
+  ? DynamoDBDocumentClient.from(new DynamoDBClient({}), { marshallOptions: { removeUndefinedValues: true } })
+  : null;
 const tableNames: Record<TableName, string> = {
   users: `${config.dynamoTablePrefix}Users`,
   materials: `${config.dynamoTablePrefix}Materials`,
@@ -17,25 +19,26 @@ const tableNames: Record<TableName, string> = {
 };
 
 export function persistItem(table: TableName, item: Record<string, unknown>) {
-  if (!client) return;
-  void client.send(new PutCommand({ TableName: tableNames[table], Item: item })).catch((error) => {
-    console.error(`DynamoDB write failed for ${tableNames[table]}`, error);
-  });
+  if (!client) return Promise.resolve();
+  return client.send(new PutCommand({ TableName: tableNames[table], Item: item })).then(() => undefined);
 }
 
 export function removeItem(table: TableName, id: string) {
-  if (!client) return;
-  void client.send(new DeleteCommand({ TableName: tableNames[table], Key: { id } })).catch((error) => {
-    console.error(`DynamoDB delete failed for ${tableNames[table]}`, error);
-  });
+  if (!client) return Promise.resolve();
+  return client.send(new DeleteCommand({ TableName: tableNames[table], Key: { id } })).then(() => undefined);
 }
 
 export async function hydrateStore() {
   if (!client) return;
   const store = getStore();
-  for (const table of Object.keys(tableNames) as TableName[]) {
-    const result = await client.send(new ScanCommand({ TableName: tableNames[table] }));
-    for (const item of result.Items ?? []) {
+  const tables = Object.keys(tableNames) as TableName[];
+  const results = await Promise.all(tables.map((table) => client.send(
+    new ScanCommand({ TableName: tableNames[table], ConsistentRead: true }),
+  )));
+
+  for (const table of tables) store[table].clear();
+  for (const [index, table] of tables.entries()) {
+    for (const item of results[index].Items ?? []) {
       if (!item.id) continue;
       store[table].set(String(item.id), item as never);
     }
