@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ApiError, getAdminClient, getAuthClient, getProfile, requireUser } from './supabase';
-import { findMaterialMatches } from './matching';
+import { ApiError, getAdminClient, getAuthClient, getProfile, requireUser } from './supabase.js';
+import { findMaterialMatches } from './matching.js';
 
 interface MaterialRow {
   id: string;
