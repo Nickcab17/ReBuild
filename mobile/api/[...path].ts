@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ApiError, getAdminClient, getAuthClient, getProfile, requireUser } from './supabase.js';
 import { findMaterialMatches } from './matching.js';
 
-interface MaterialRow {
+export interface MaterialRow {
   id: string;
   user_id: string;
   name: string;
@@ -21,7 +21,7 @@ interface MaterialRow {
   owner?: { name: string } | { name: string }[] | null;
 }
 
-interface RequestRow {
+export interface RequestRow {
   id: string;
   user_id: string;
   material: string;
@@ -104,7 +104,7 @@ function throwDatabaseError(error: { message: string; code?: string } | null, op
   throw new ApiError(500, 'No se pudo completar la operación. Intenta nuevamente.');
 }
 
-async function createMatchesForMaterial(material: MaterialRow) {
+export async function createMatchesForMaterial(material: MaterialRow) {
   const { data, error } = await getAdminClient().from('requests').select('*');
   throwDatabaseError(error, 'requests query for matches');
 
@@ -131,7 +131,7 @@ async function createMatchesForMaterial(material: MaterialRow) {
   throwDatabaseError(result.error, 'material matches write');
 }
 
-async function createMatchesForRequest(request: RequestRow) {
+export async function createMatchesForRequest(request: RequestRow) {
   const { data, error } = await getAdminClient()
     .from('materials')
     .select('*')
