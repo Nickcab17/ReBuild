@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ApiError, getAdminClient, getAuthClient, getProfile, requireUser } from './supabase.js';
+import { ApiError, createRecoveryClient, getAdminClient, getAuthClient, getProfile, requireUser } from './supabase.js';
 import { findMaterialMatches } from './matching.js';
 
 export interface MaterialRow {
@@ -221,6 +221,39 @@ async function handleRequest(request: VercelRequest, response: VercelResponse) {
       refreshToken: data.session.refresh_token,
       user: await getProfile(data.user.id),
     });
+  }
+
+  if (route === 'auth/recover' && method === 'POST') {
+    const email = requiredText(body, 'email').toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ApiError(400, 'Escribe un correo válido.');
+
+    const host = (request.headers.host ?? '').split(':')[0].toLowerCase();
+    const redirectOrigin = host === 'localhost' || host === '127.0.0.1'
+      ? `http://${host}:8081`
+      : 'https://rebuild-mobile.vercel.app';
+    try {
+      const { error } = await getAuthClient().auth.resetPasswordForEmail(email, {
+        redirectTo: `${redirectOrigin}/`,
+      });
+      if (error) console.error('Supabase password recovery request failed', error.status ?? 'unknown');
+    } catch (error) {
+      console.error('Supabase password recovery request failed', error instanceof Error ? error.name : 'unknown');
+    }
+    return response.status(200).json({ ok: true });
+  }
+
+  if (route === 'auth/update-password' && method === 'POST') {
+    const accessToken = requiredText(body, 'accessToken');
+    const refreshToken = requiredText(body, 'refreshToken');
+    const password = requiredText(body, 'password');
+    if (password.length < 6) throw new ApiError(400, 'La contraseña debe tener al menos 6 caracteres.');
+
+    const recoveryClient = createRecoveryClient();
+    const { error: sessionError } = await recoveryClient.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+    if (sessionError) throw new ApiError(400, 'El enlace de recuperación venció o no es válido. Solicita uno nuevo.');
+    const { error } = await recoveryClient.auth.updateUser({ password });
+    if (error) throw new ApiError(400, 'No se pudo actualizar la contraseña. Solicita un nuevo enlace e inténtalo otra vez.');
+    return response.status(200).json({ ok: true });
   }
 
   if (route === 'auth/me' && method === 'GET') {

@@ -11,7 +11,7 @@ import { clearLegacyDemoStorage, clearWebAuthToken, readWebAuthSession, saveWebA
 import { isApiConfigured, type ApiUser, api } from '../services/api';
 import { loadPersistedWebData } from '../services/webPersistence';
 
-type Stage = 'home' | 'publish' | 'explore' | 'matches' | 'detail' | 'connect' | 'login' | 'register' | 'profile';
+type Stage = 'home' | 'publish' | 'explore' | 'matches' | 'detail' | 'connect' | 'login' | 'register' | 'profile' | 'recover' | 'recoverySent' | 'resetPassword' | 'passwordUpdated';
 type PublicationForm = Omit<DemoPublication, 'id' | 'owner' | 'intent' | 'quantity'> & { quantity: string };
 type DemoAccount = Pick<ApiUser, 'id' | 'name' | 'email' | 'city' | 'role' | 'createdAt'> & { password: string };
 
@@ -111,6 +111,8 @@ export default function WebDemoHome() {
   const [authName, setAuthName] = useState('');
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [recoverySession, setRecoverySession] = useState<{ accessToken: string; refreshToken: string } | null>(null);
   const [authError, setAuthError] = useState('');
 
   const visibleOffers = useMemo(() => [
@@ -136,6 +138,19 @@ export default function WebDemoHome() {
   }, [currentUser, localPublications, myPublications, persistedMatches]);
 
   useEffect(() => {
+    const recoveryParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    if (recoveryParams.get('type') === 'recovery') {
+      const accessToken = recoveryParams.get('access_token');
+      const refreshToken = recoveryParams.get('refresh_token');
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+      if (accessToken && refreshToken) {
+        setRecoverySession({ accessToken, refreshToken });
+        setStage('resetPassword');
+      } else {
+        setAuthError('El enlace de recuperación no es válido. Solicita uno nuevo.');
+        setStage('login');
+      }
+    }
     try {
       clearLegacyDemoStorage(!useLocalDemo);
     } catch {
@@ -184,6 +199,55 @@ export default function WebDemoHome() {
       setPublicationNotice('No se pudieron leer las publicaciones guardadas en este navegador.');
     }
   }, []);
+
+  const requestPasswordRecovery = async () => {
+    const email = authEmail.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setAuthError('Escribe un correo válido.');
+      return;
+    }
+    try {
+      await api.requestPasswordRecovery(email);
+      setAuthError('');
+      setStage('recoverySent');
+    } catch {
+      // Keep account and provider details private; the confirmation stays generic.
+      setStage('recoverySent');
+    }
+  };
+
+  const updateRecoveredPassword = async () => {
+    if (authPassword.length < 6) {
+      setAuthError('La contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+    if (authPassword !== confirmPassword) {
+      setAuthError('Las contraseñas no coinciden.');
+      return;
+    }
+    if (!recoverySession) {
+      setAuthError('El enlace de recuperación venció o no es válido. Solicita uno nuevo.');
+      return;
+    }
+    try {
+      await api.updatePassword({ ...recoverySession, password: authPassword });
+      setRecoverySession(null);
+      setAuthPassword('');
+      setConfirmPassword('');
+      setAuthError('');
+      setStage('passwordUpdated');
+    } catch (updateError) {
+      setAuthError(updateError instanceof Error ? updateError.message : 'No se pudo actualizar la contraseña.');
+    }
+  };
+
+  const returnToLogin = () => {
+    setRecoverySession(null);
+    setAuthPassword('');
+    setConfirmPassword('');
+    setAuthError('');
+    setStage('login');
+  };
 
   const update = (field: keyof PublicationForm, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -789,8 +853,38 @@ export default function WebDemoHome() {
       <TextInput value={authPassword} onChangeText={setAuthPassword} placeholder="Contraseña" style={styles.input} placeholderTextColor={colors.muted} secureTextEntry />
       {authError ? <Text accessibilityRole="alert" style={styles.error}>{authError}</Text> : null}
       <PrimaryButton title={mode === 'register' ? 'Crear cuenta' : 'Iniciar sesión'} onPress={mode === 'register' ? register : login} style={styles.submitButton} />
+      {mode === 'login' ? <TouchableOpacity accessibilityRole="button" onPress={() => { setAuthError(''); setStage('recover'); }} style={styles.backLink}>
+        <Text style={styles.linkText}>¿Olvidaste tu contraseña?</Text>
+      </TouchableOpacity> : null}
       <TouchableOpacity accessibilityRole="button" onPress={() => openAuth(mode === 'register' ? 'login' : 'register')} style={styles.backLink}>
         <Text style={styles.linkText}>{mode === 'register' ? '¿Ya tienes cuenta? Inicia sesión' : '¿Primera vez? Crear cuenta'}</Text>
+      </TouchableOpacity>
+    </>
+  );
+
+  const recoveryScreen = () => (
+    <>
+      {topHeader}
+      <Text style={styles.screenTitle}>{stage === 'resetPassword' ? 'Nueva contraseña' : stage === 'passwordUpdated' ? 'Contraseña actualizada' : stage === 'recoverySent' ? 'Correo enviado' : 'Recuperar contraseña'}</Text>
+      {stage === 'recover' ? <>
+        <Text style={styles.screenSubtitle}>Escribe el correo asociado a tu cuenta.</Text>
+        <Text style={styles.label}>Correo electrónico *</Text>
+        <TextInput value={authEmail} onChangeText={setAuthEmail} placeholder="correo@ejemplo.com" style={styles.input} placeholderTextColor={colors.muted} keyboardType="email-address" autoCapitalize="none" />
+        {authError ? <Text accessibilityRole="alert" style={styles.error}>{authError}</Text> : null}
+        <PrimaryButton title="Enviar enlace" onPress={requestPasswordRecovery} style={styles.submitButton} />
+      </> : null}
+      {stage === 'recoverySent' ? <Text style={styles.screenSubtitle}>Si existe una cuenta con ese correo, recibirás un enlace para restablecer tu contraseña.</Text> : null}
+      {stage === 'resetPassword' ? <>
+        <Text style={styles.label}>Nueva contraseña</Text>
+        <TextInput value={authPassword} onChangeText={setAuthPassword} placeholder="Mínimo 6 caracteres" style={styles.input} placeholderTextColor={colors.muted} secureTextEntry />
+        <Text style={styles.label}>Confirmar nueva contraseña</Text>
+        <TextInput value={confirmPassword} onChangeText={setConfirmPassword} placeholder="Repite la contraseña" style={styles.input} placeholderTextColor={colors.muted} secureTextEntry />
+        {authError ? <Text accessibilityRole="alert" style={styles.error}>{authError}</Text> : null}
+        <PrimaryButton title="Actualizar contraseña" onPress={updateRecoveredPassword} style={styles.submitButton} />
+      </> : null}
+      {stage === 'passwordUpdated' ? <Text style={styles.screenSubtitle}>Contraseña actualizada correctamente.</Text> : null}
+      <TouchableOpacity accessibilityRole="button" onPress={returnToLogin} style={styles.backLink}>
+        <Text style={styles.linkText}>← Volver al login</Text>
       </TouchableOpacity>
     </>
   );
@@ -876,6 +970,10 @@ export default function WebDemoHome() {
       case 'connect': return connectScreen();
       case 'login': return authScreen('login');
       case 'register': return authScreen('register');
+      case 'recover':
+      case 'recoverySent':
+      case 'resetPassword':
+      case 'passwordUpdated': return recoveryScreen();
       case 'profile': return profileScreen();
       default: return homeScreen();
     }

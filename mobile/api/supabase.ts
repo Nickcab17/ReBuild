@@ -36,6 +36,14 @@ export function getAuthClient() {
   return authClient;
 }
 
+export function createRecoveryClient() {
+  return createClient(
+    requiredEnvironment('SUPABASE_URL'),
+    requiredEnvironment('SUPABASE_ANON_KEY'),
+    clientOptions(),
+  );
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);

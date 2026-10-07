@@ -106,6 +106,8 @@ export const api = {
   register: (payload: { name: string; email: string; password: string; city?: string }) => request<ApiSession>('/api/auth/register', { method: 'POST', body: JSON.stringify(payload) }),
   login: (payload: { email: string; password: string }) => request<ApiSession>('/api/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
   refreshSession: (refreshToken: string) => request<ApiSession>('/api/auth/refresh', { method: 'POST', body: JSON.stringify({ refreshToken }) }),
+  requestPasswordRecovery: (email: string) => request<{ ok: boolean }>('/api/auth/recover', { method: 'POST', body: JSON.stringify({ email }) }),
+  updatePassword: (payload: { accessToken: string; refreshToken: string; password: string }) => request<{ ok: boolean }>('/api/auth/update-password', { method: 'POST', body: JSON.stringify(payload) }),
   getMe: (token: string) => request<ApiUser>('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
   listMaterials: async (params: Record<string, string | number | undefined> = {}) => {
     const query = Object.entries(params).filter(([, value]) => value !== undefined && value !== '').map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`).join('&');
