@@ -14,8 +14,9 @@ export default async function handler(request: VercelRequest, response: VercelRe
       throw new ApiError(403, 'No tienes permiso para ejecutar esta consulta.');
     }
 
-    const summary = await previewDemoMigration();
-    return response.status(200).json(summary);
+    response.setHeader('Cache-Control', 'no-store');
+    const preview = await previewDemoMigration();
+    return response.status(200).json(preview);
   } catch (error) {
     if (error instanceof ApiError) return response.status(error.status).json({ message: error.message });
     console.error('Demo migration dry-run failed', error instanceof Error ? error.name : 'unknown error');

@@ -95,13 +95,43 @@ test('dry-run summary reports insertions, skips, and conflicts without changing 
   existing.requests.push({ ...conflictingRequest.row, material: 'Conflicting source row' });
 
   const summary = summarizeMigrationPreview(records, existing);
-  assert.deepEqual(summary, {
-    offersFound: 8,
-    requestsFound: 8,
-    offersToInsert: 6,
-    offersSkipped: 2,
-    requestsToInsert: 7,
-    requestsSkipped: 0,
-    conflicts: 1,
-  });
+  assert.equal(summary.account.email, 'nicocg170709@gmail.com');
+  assert.equal(summary.account.userId, targetUserId);
+  assert.equal(summary.publications.length, 16);
+  assert.equal(summary.offersFound, 8);
+  assert.equal(summary.requestsFound, 8);
+  assert.equal(summary.offersToInsert, 6);
+  assert.equal(summary.offersSkipped, 2);
+  assert.equal(summary.requestsToInsert, 7);
+  assert.equal(summary.requestsSkipped, 0);
+  assert.equal(summary.conflicts, 1);
+
+  const stable = summary.publications.find(({ demoId }) => demoId === stableOffer.sourceId);
+  assert.ok(stable);
+  assert.equal(stable.status, 'skip');
+  assert.match(stable.reason, /ID determinístico/);
+  assert.equal(stable.migrationId, stableOffer.row.id);
+  assert.equal(stable.existingId, stableOffer.row.id);
+
+  const equivalent = summary.publications.find(({ demoId }) => demoId === equivalentOffer.sourceId);
+  assert.ok(equivalent);
+  assert.equal(equivalent.status, 'skip');
+  assert.match(equivalent.reason, /equivalente/);
+  assert.equal(equivalent.existingId, '123e4567-e89b-42d3-a456-426614174001');
+
+  const conflict = summary.publications.find(({ demoId }) => demoId === conflictingRequest.sourceId);
+  assert.ok(conflict);
+  assert.equal(conflict.type, 'request');
+  assert.equal(conflict.status, 'conflict');
+  assert.match(conflict.reason, /Conflicto/);
+
+  const insert = summary.publications.find(({ status }) => status === 'insert');
+  assert.ok(insert);
+  assert.match(insert.reason, /No se encontró/);
+  assert.equal(insert.migrationId, records.find(({ sourceId }) => sourceId === insert.demoId)?.row.id);
+
+  assert.equal(
+    summary.publications.filter(({ status }) => status === 'insert' || status === 'skip' || status === 'conflict').length,
+    16,
+  );
 });

@@ -28,6 +28,7 @@ export interface PlannedRecord {
 }
 
 export interface MigrationPreview {
+  account: { email: string; userId: string };
   offersFound: number;
   requestsFound: number;
   offersToInsert: number;
@@ -35,6 +36,17 @@ export interface MigrationPreview {
   requestsToInsert: number;
   requestsSkipped: number;
   conflicts: number;
+  publications: PublicationPreview[];
+}
+
+export interface PublicationPreview {
+  demoId: string;
+  type: 'offer' | 'request';
+  name: string;
+  status: 'insert' | 'skip' | 'conflict';
+  reason: string;
+  migrationId: string;
+  existingId?: string;
 }
 
 export interface MigrationManifest {
@@ -201,29 +213,58 @@ export function planRecords(
 export function summarizeMigrationPreview(
   records: MigrationRecord[],
   existingRows: Record<MigrationRecord['table'], Array<Record<string, unknown>>>,
+  targetUserId = records[0]?.row.user_id ?? '',
 ): MigrationPreview {
-  const plans: PlannedRecord[] = [];
-  let conflicts = 0;
-  for (const record of records) {
+  const publications: PublicationPreview[] = records.map((record) => {
     try {
-      plans.push(...planRecords([record], existingRows));
+      const [plan] = planRecords([record], existingRows);
+      const type = record.table === 'materials' ? 'offer' : 'request';
+      if (plan.action === 'skip') {
+        const reason = plan.reason === 'stable-id'
+          ? 'Ya existe una publicación con el ID determinístico y sus datos coinciden.'
+          : 'Ya existe una publicación equivalente con estos datos.';
+        return {
+          demoId: record.sourceId,
+          type,
+          name: record.table === 'materials' ? record.row.name : record.row.material,
+          status: 'skip',
+          reason,
+          migrationId: record.row.id,
+          existingId: String(plan.existing?.id ?? ''),
+        };
+      }
+      return {
+        demoId: record.sourceId,
+        type,
+        name: record.table === 'materials' ? record.row.name : record.row.material,
+        status: 'insert',
+        reason: 'No se encontró una publicación con el ID determinístico ni una equivalente.',
+        migrationId: record.row.id,
+      };
     } catch (error) {
       if (!(error instanceof MigrationError)) throw error;
-      conflicts += 1;
+      return {
+        demoId: record.sourceId,
+        type: record.table === 'materials' ? 'offer' : 'request',
+        name: record.table === 'materials' ? record.row.name : record.row.material,
+        status: 'conflict',
+        reason: error.message,
+        migrationId: record.row.id,
+      };
     }
-  }
-  const offers = plans.filter(({ record }) => record.table === 'materials');
-  const requests = plans.filter(({ record }) => record.table === 'requests');
-  const offersToInsert = offers.filter(({ action }) => action === 'insert').length;
-  const requestsToInsert = requests.filter(({ action }) => action === 'insert').length;
+  });
+  const offers = publications.filter(({ type }) => type === 'offer');
+  const requests = publications.filter(({ type }) => type === 'request');
   return {
-    offersFound: records.filter(({ table }) => table === 'materials').length,
-    requestsFound: records.filter(({ table }) => table === 'requests').length,
-    offersToInsert,
-    offersSkipped: offers.length - offersToInsert,
-    requestsToInsert,
-    requestsSkipped: requests.length - requestsToInsert,
-    conflicts,
+    account: { email: TARGET_EMAIL, userId: targetUserId },
+    offersFound: offers.length,
+    requestsFound: requests.length,
+    offersToInsert: offers.filter(({ status }) => status === 'insert').length,
+    offersSkipped: offers.filter(({ status }) => status === 'skip').length,
+    requestsToInsert: requests.filter(({ status }) => status === 'insert').length,
+    requestsSkipped: requests.filter(({ status }) => status === 'skip').length,
+    conflicts: publications.filter(({ status }) => status === 'conflict').length,
+    publications,
   };
 }
 
@@ -232,7 +273,7 @@ export async function previewDemoMigration(): Promise<MigrationPreview> {
   const target = await locateTargetUser(client);
   const records = buildMigrationRecords(target.id);
   const existing = await loadExistingRows(client, records, target.id);
-  return summarizeMigrationPreview(records, existing);
+  return summarizeMigrationPreview(records, existing, target.id);
 }
 
 function requiredEnvironment(name: string) {

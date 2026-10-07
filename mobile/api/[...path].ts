@@ -108,7 +108,7 @@ export async function createMatchesForMaterial(material: MaterialRow) {
   const { data, error } = await getAdminClient().from('requests').select('*');
   throwDatabaseError(error, 'requests query for matches');
 
-  const pendingMatches = (data as RequestRow[]).map((request) => {
+  const pendingMatches = (data as RequestRow[]).filter((request) => request.user_id !== material.user_id).map((request) => {
     const result = findMaterialMatches(
       `${material.name} ${material.description}`,
       `${request.material} ${request.description}`,
@@ -138,7 +138,7 @@ export async function createMatchesForRequest(request: RequestRow) {
     .eq('availability', 'Disponible');
   throwDatabaseError(error, 'materials query for matches');
 
-  const pendingMatches = (data as MaterialRow[]).map((material) => {
+  const pendingMatches = (data as MaterialRow[]).filter((material) => material.user_id !== request.user_id).map((material) => {
     const result = findMaterialMatches(
       `${material.name} ${material.description} ${material.category}`,
       `${request.material} ${request.description} ${request.category}`,
