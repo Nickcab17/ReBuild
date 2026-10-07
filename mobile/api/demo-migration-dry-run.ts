@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { previewDemoMigration, TARGET_EMAIL } from '../scripts/migrate-demo-to-supabase.js';
 import { ApiError, requireUser } from './supabase.js';
+
+const TARGET_EMAIL = 'nicocg170709@gmail.com';
 
 function redactDiagnosticText(value: string) {
   let safeValue = value;
@@ -51,6 +52,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
       throw new ApiError(403, 'No tienes permiso para ejecutar esta consulta.');
     }
 
+    const { previewDemoMigration } = await import('../scripts/migrate-demo-to-supabase.js');
     response.setHeader('Cache-Control', 'no-store');
     const preview = await previewDemoMigration();
     return response.status(200).json(preview);
